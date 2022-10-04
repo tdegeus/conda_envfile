@@ -3,6 +3,7 @@ channels:
 dependencies:
 - click
 - furo
+- packaging
 - pre-commit
 - python
 - pyyaml

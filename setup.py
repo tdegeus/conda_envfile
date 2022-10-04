@@ -21,7 +21,7 @@ setup(
     packages=find_packages(),
     use_scm_version={"write_to": f"{project_name}/_version.py"},
     setup_requires=["setuptools_scm"],
-    install_requires=["click", "pyyaml"],
+    install_requires=["click", "packaging", "pyyaml"],
     entry_points={
         "console_scripts": [
             f"conda_envfile_merge = {project_name}:_conda_envfile_merge_cli",
