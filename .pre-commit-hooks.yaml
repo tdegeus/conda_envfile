@@ -1,5 +1,5 @@
-- id: conda_envfile
-  name: conda_envfile
+- id: conda_envfile_parse
+  name: conda_envfile_parse
   description: Parse conda environment file
   minimum_pre_commit_version: 2.1.0
   entry: conda_envfile_parse
