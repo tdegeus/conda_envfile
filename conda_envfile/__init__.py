@@ -56,6 +56,51 @@ def parse_file(*args: list[str]) -> dict:
     return env
 
 
+def remove(dependencies: list[str], *args: list[str]) -> list[str]:
+    """
+    Remove dependencies.
+
+    :param dependencies: List of dependencies.
+    :param args: List of dependencies to remove.
+    :return: List of dependencies.
+    """
+
+    ret = []
+
+    for dep in dependencies:
+
+        dep = re.split("#", dep)[0]
+
+        # foo *
+
+        if re.match(r"^([^\*^\s]*)(\s*)(\*)$", dep):
+            name = re.split(r"^([^\*^\s]*)(\s*)(\*)$", dep)[1]
+
+        # foo =1.0.*
+
+        elif re.match(r"^([^=^\s]*)(\s*)([=]*)([^\*]*)(\*)$", dep):
+            name = re.split(r"^([^=^\s]*)(\s*)([=]*)([^\*]*)(\*)$", dep)[1]
+
+        # foo
+        # foo =1.0
+        # foo >1.0
+        # foo >=1.0
+        # foo <1.0
+        # foo <=1.0
+        # foo >1.0, <2.0
+        # foo >=1.0, <2.0
+        # foo >1.0, <=2.0
+        # foo >=1.0, <=2.0
+
+        else:
+            name = re.split(r"^([^>^<^=^\s]*)(\s*)([<>=]*)(.*)$", dep)[1]
+
+        if name not in args:
+            ret.append(dep)
+
+    return ret
+
+
 def unique(*args) -> list[str]:
     """
     Return a list of unique dependencies.
@@ -349,6 +394,7 @@ def _conda_envfile_merge_parser():
     parser.add_argument("-f", "--force", action="store_true", help="Force overwrite output file.")
     parser.add_argument("-o", "--output", type=str, help="Write to output file.")
     parser.add_argument("-a", "--append", type=str, action="append", help="Append dependencies.")
+    parser.add_argument("-r", "--remove", type=str, action="append", help="Remove dependencies.")
     parser.add_argument("--version", action="version", version=version)
     parser.add_argument("files", type=str, nargs="*", help="Input files.")
     return parser
@@ -364,6 +410,9 @@ def conda_envfile_merge(args: list[str]):
     args = parser.parse_args(args)
     env = parse_file(*args.files)
     env["dependencies"] = unique(*(env["dependencies"] + args.append))
+
+    if args.remove:
+        env["dependencies"] = remove(env["dependencies"], *args.remove)
 
     if not args.output:
         print(yaml.dump(env, default_flow_style=False, default_style="").strip())
