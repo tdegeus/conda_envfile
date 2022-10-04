@@ -169,6 +169,7 @@ def _conda_envfile_merge_parser():
     parser = argparse.ArgumentParser(description=desc)
     parser.add_argument("-f", "--force", action="store_true", help="Force overwrite output file.")
     parser.add_argument("-o", "--output", type=str, help="Write to output file.")
+    parser.add_argument("-a", "--append", type=str, action="append", help="Append dependencies.")
     parser.add_argument("--version", action="version", version=version)
     parser.add_argument("files", type=str, nargs="*", help="Input files.")
     return parser
@@ -183,7 +184,7 @@ def conda_envfile_merge(args: list[str]):
     parser = _conda_envfile_merge_parser()
     args = parser.parse_args(args)
     env = parse_file(*args.files)
-    env["dependencies"] = unique(*env["dependencies"])
+    env["dependencies"] = unique(*(env["dependencies"] + args.append))
 
     if not args.output:
         print(yaml.dump(env, default_flow_style=False, default_style="").strip())
