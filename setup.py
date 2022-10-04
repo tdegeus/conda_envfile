@@ -3,7 +3,7 @@ from pathlib import Path
 from setuptools import find_packages
 from setuptools import setup
 
-project_name = "conda_merge_envfile"
+project_name = "conda_envfile"
 
 this_directory = Path(__file__).parent
 long_description = (this_directory / "README.md").read_text()
@@ -24,7 +24,8 @@ setup(
     install_requires=["click", "pyyaml"],
     entry_points={
         "console_scripts": [
-            f"conda_merge_envfile = {project_name}:_conda_merge_envfile_cli",
+            f"conda_envfile_merge = {project_name}:_conda_envfile_merge_cli",
+            f"conda_envfile_parse = {project_name}:_conda_envfile_parse_cli",
         ]
     },
 )

@@ -129,41 +129,59 @@ def unique(*args) -> list[str]:
     return [deps[key]["ret"] for key in sorted(deps)]
 
 
-
-def _conda_merge_envfile_parser():
+def _conda_envfile_parse_parser():
     """
-    Return parser for :py:func:`conda_merge_envfile`.
+    Return parser for :py:func:`conda_envfile_parse`.
+    """
+
+    desc = "Parse YAML environnement files."
+    parser = argparse.ArgumentParser(description=desc)
+    parser.add_argument("--version", action="version", version=version)
+    parser.add_argument("files", type=str, nargs="*", help="Input files.")
+    return parser
+
+
+def conda_envfile_parse(args: list[str]):
+    """
+    Command-line tool to print datasets from a file, see ``--help``.
+    :param args: Command-line arguments (should be all strings).
+    """
+
+    parser = _conda_envfile_parse_parser()
+    args = parser.parse_args(args)
+
+    for filename in args.files:
+        env = parse_file(filename)
+        env["dependencies"] = unique(*env["dependencies"])
+        with open(filename, "w") as file:
+            yaml.dump(env, file)
+
+def _conda_envfile_parse_cli():
+    conda_envfile_parse(sys.argv[1:])
+
+
+def _conda_envfile_merge_parser():
+    """
+    Return parser for :py:func:`conda_envfile_merge`.
     """
 
     desc = "Merge YAML environnement files."
     parser = argparse.ArgumentParser(description=desc)
     parser.add_argument("-f", "--force", action="store_true", help="Force overwrite output file.")
     parser.add_argument("-o", "--output", type=str, help="Write to output file.")
-    parser.add_argument("--format", action="store_true", help="Format files in place.")
     parser.add_argument("--version", action="version", version=version)
     parser.add_argument("files", type=str, nargs="*", help="Input files.")
     return parser
 
 
-def conda_merge_envfile(args: list[str]):
+def conda_envfile_merge(args: list[str]):
     """
     Command-line tool to print datasets from a file, see ``--help``.
     :param args: Command-line arguments (should be all strings).
     """
 
-    parser = _conda_merge_envfile_parser()
+    parser = _conda_envfile_merge_parser()
     args = parser.parse_args(args)
-
-    if args.format:
-        if args.output:
-            raise ValueError("Cannot use --format and --output together.")
-        for filename in args.files:
-            env = parse_file(filename)
-            env["dependencies"] = unique(*env["dependencies"])
-            with open(filename, "w") as file:
-                yaml.dump(env, file)
-        return 0
-
     env = parse_file(*args.files)
     env["dependencies"] = unique(*env["dependencies"])
 
@@ -188,5 +206,5 @@ def conda_merge_envfile(args: list[str]):
         yaml.dump(env, file)
 
 
-def _conda_merge_envfile_cli():
-    conda_merge_envfile(sys.argv[1:])
+def _conda_envfile_merge_cli():
+    conda_envfile_merge(sys.argv[1:])
