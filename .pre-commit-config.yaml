@@ -1,0 +1,46 @@
+repos:
+- repo: https://github.com/psf/black
+  rev: 22.8.0
+  hooks:
+  - id: black
+    args: [--safe, --quiet, --line-length=100]
+- repo: https://github.com/pre-commit/pre-commit-hooks
+  rev: v4.3.0
+  hooks:
+  - id: trailing-whitespace
+  - id: end-of-file-fixer
+  - id: check-yaml
+  - id: debug-statements
+- repo: https://github.com/macisamuele/language-formatters-pre-commit-hooks
+  rev: v2.4.0
+  hooks:
+  - id: pretty-format-yaml
+    args: [--autofix, --indent, '2', --preserve-quotes]
+- repo: https://github.com/humitos/mirrors-autoflake.git
+  rev: v1.1
+  hooks:
+  - id: autoflake
+    args: [--in-place, --remove-unused-variable]
+- repo: https://github.com/asottile/reorder_python_imports
+  rev: v3.8.3
+  hooks:
+  - id: reorder-python-imports
+- repo: https://github.com/asottile/pyupgrade
+  rev: v3.0.0
+  hooks:
+  - id: pyupgrade
+    args: [--py36-plus]
+- repo: https://github.com/PyCQA/flake8
+  rev: 5.0.4
+  hooks:
+  - id: flake8
+    args: ["--max-line-length=100", "--per-file-ignores=shelephant/__init__.py:F401"]
+- repo: https://github.com/asottile/setup-cfg-fmt
+  rev: v2.0.0
+  hooks:
+  - id: setup-cfg-fmt
+# - repo: https://github.com/econchick/interrogate
+#   rev: 1.5.0
+#   hooks:
+#   - id: interrogate
+#     args: [-vv, -i, --fail-under=80]
