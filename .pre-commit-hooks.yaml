@@ -4,4 +4,4 @@
   minimum_pre_commit_version: 2.1.0
   entry: conda_envfile_parse
   language: python
-  types: [yml]
+  types: [yaml]
