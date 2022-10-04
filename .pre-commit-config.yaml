@@ -34,13 +34,13 @@ repos:
   rev: 5.0.4
   hooks:
   - id: flake8
-    args: ["--max-line-length=100", "--per-file-ignores=shelephant/__init__.py:F401"]
+    args: [--max-line-length=100]
 - repo: https://github.com/asottile/setup-cfg-fmt
   rev: v2.0.0
   hooks:
   - id: setup-cfg-fmt
-# - repo: https://github.com/econchick/interrogate
-#   rev: 1.5.0
-#   hooks:
-#   - id: interrogate
-#     args: [-vv, -i, --fail-under=80]
+- repo: https://github.com/tdegeus/conda_envfile
+  rev: v0.0.4
+  hooks:
+  - id: conda_envfile_parse
+    files: "environment.yaml"

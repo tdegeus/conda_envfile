@@ -55,6 +55,7 @@ def parse_file(*args: list[str]) -> dict:
 
     return env
 
+
 def unique(*args) -> list[str]:
     """
     Return a list of unique dependencies.
@@ -75,6 +76,80 @@ def unique(*args) -> list[str]:
         else:
             dep = dep[0]
 
+        # foo *
+
+        if re.match(r"^([^\*^\s]*)(\s*)(\*)$", dep):
+            _, name, _, special, _ = re.split(r"^([^\*^\s]*)(\s*)(\*)$", dep)
+            if name not in deps:
+                deps[name] = {"special": special}
+            elif len(deps[name]) == 0:
+                deps[name] = {"special": special}
+            continue
+
+        # foo =1.0.*
+
+        if re.match(r"^([^=^\s]*)(\s*)([=]*)([^\*]*)(\*)$", dep):
+
+            _, name, _, eq, basename, special, _ = re.split(
+                r"^([^=^\s]*)(\s*)([=]*)([^\*]*)(\*)$", dep
+            )
+            lower = basename.rstrip(".")
+
+            if eq != "=":
+                raise ValueError(f"Invalid special dependency '{dep}'.")
+
+            if len(lower.split(".")) == 0:
+                upper = f"{int(lower) + 1}"
+            else:
+                base, minor = lower.rsplit(".", 1)
+                upper = f"{base}.{int(minor) + 1}.0"
+
+            if len(lower) == 0:
+                lower = "0"
+            else:
+                lower = f"{lower}.0"
+
+            if name not in deps:
+                deps[name] = {"special": eq + basename + special, ">=": lower, "<": upper}
+            else:
+                if ">=" in deps[name]:
+                    if _parse(lower) >= _parse(deps[name][">="]):
+                        del deps[name][">="]
+                if ">=" in deps[name]:
+                    if _parse(lower) > _parse(deps[name][">="]):
+                        del deps[name][">"]
+                if "<=" in deps[name]:
+                    if _parse(upper) <= _parse(deps[name]["<="]):
+                        del deps[name]["<="]
+                if "<" in deps[name]:
+                    if _parse(upper) < _parse(deps[name]["<"]):
+                        del deps[name]["<"]
+                if not (
+                    "<" in deps[name]
+                    or "<=" in deps[name]
+                    or ">" in deps[name]
+                    or ">=" in deps[name]
+                ):
+                    deps[name] = {"special": basename + special, ">=": lower, "<": upper}
+                else:
+                    if not (">" in deps[name] or ">=" in deps[name]):
+                        deps[name][">="] = lower
+                    if not ("<" in deps[name] or "<=" in deps[name]):
+                        deps[name]["<"] = upper
+
+            continue
+
+        # foo
+        # foo =1.0
+        # foo >1.0
+        # foo >=1.0
+        # foo <1.0
+        # foo <=1.0
+        # foo >1.0, <2.0
+        # foo >=1.0, <2.0
+        # foo >1.0, <=2.0
+        # foo >=1.0, <=2.0
+
         _, name, _, eq, ver, _ = re.split(r"^([^>^<^=^\s]*)(\s*)([<>=]*)(.*)$", dep)
         eq2 = None
         ver2 = None
@@ -94,37 +169,140 @@ def unique(*args) -> list[str]:
                 if b:
                     raise ValueError(f"Missing equality in '{dep}'")
                 continue
-            if "*" in b:
-                raise ValueError(f"WIP: wildcard not yet implemented '{dep}'")
             ret[a] = b
 
         if name not in deps:
             deps[name] = ret
-        else:
-            for key, value in ret.items():
-                if key in deps[name]:
-                    if _parse(value) > _parse(deps[name][key]):
-                        deps[name][key] = value
+            continue
+
+        if len(ret) == 0:
+            continue
+
+        if "=" in deps[name]:
+            if "=" in ret:
+                if _parse(ret["="]) != _parse(deps[name]["="]):
+                    raise ValueError(f"Multiple versions of '{name}' in '{dep}'")
+            elif ">" in ret:
+                if _parse(ret[">"]) >= _parse(deps[name]["="]):
+                    raise ValueError(f"Restriction clash '{dep}'")
+            elif ">=" in ret:
+                if _parse(ret[">="]) < _parse(deps[name]["="]):
+                    raise ValueError(f"Restriction clash '{dep}'")
+            elif "<" in ret:
+                if _parse(ret["<"]) <= _parse(deps[name]["="]):
+                    raise ValueError(f"Restriction clash '{dep}'")
+            elif "<=" in ret:
+                if _parse(ret["<="]) < _parse(deps[name]["="]):
+                    raise ValueError(f"Restriction clash '{dep}'")
+            continue
+
+        if "=" in ret:
+            if "=" in deps[name]:
+                if _parse(ret["="]) != _parse(deps[name]["="]):
+                    raise ValueError(f"Multiple versions of '{name}' in '{dep}'")
+                continue
+            if ">" in deps[name]:
+                if _parse(deps[name][">"]) < _parse(ret["="]):
+                    deps[name] = {"=": ret["="]}
+                    continue
                 else:
-                    deps[name][key] = value
+                    raise ValueError(f"Restriction clash '{dep}'")
+            if ">=" in deps[name]:
+                if _parse(deps[name][">="]) <= _parse(ret["="]):
+                    deps[name] = {"=": ret["="]}
+                    continue
+                else:
+                    raise ValueError(f"Restriction clash '{dep}'")
+            if "<" in deps[name]:
+                if _parse(deps[name]["<"]) > _parse(ret["="]):
+                    deps[name] = {"=": ret["="]}
+                    continue
+                else:
+                    raise ValueError(f"Restriction clash '{dep}'")
+            if "<=" in deps[name]:
+                if _parse(deps[name]["<="]) >= _parse(ret["="]):
+                    deps[name] = {"=": ret["="]}
+                    continue
+                else:
+                    raise ValueError(f"Restriction clash '{dep}'")
+
+        if ">" in deps[name] and ">" in ret:
+            if _parse(ret[">"]) > _parse(deps[name][">"]):
+                deps[name][">"] = ret[">"]
+                deps[name].pop("special", None)
+        elif ">" in ret:
+            deps[name][">"] = ret[">"]
+            deps[name].pop("special", None)
+
+        if ">=" in deps[name] and ">=" in ret:
+            if _parse(ret[">="]) >= _parse(deps[name][">="]):
+                deps[name][">="] = ret[">="]
+                deps[name].pop("special", None)
+        elif ">=" in ret:
+            deps[name][">="] = ret[">="]
+            deps[name].pop("special", None)
+
+        if "<" in deps[name] and "<" in ret:
+            if _parse(ret["<"]) < _parse(deps[name]["<"]):
+                deps[name]["<"] = ret["<"]
+                deps[name].pop("special", None)
+        elif "<" in ret:
+            deps[name]["<"] = ret["<"]
+            deps[name].pop("special", None)
+
+        if "<=" in deps[name] and "<=" in ret:
+            if _parse(ret["<="]) <= _parse(deps[name]["<="]):
+                deps[name]["<="] = ret["<="]
+                deps[name].pop("special", None)
+        elif "<=" in ret:
+            deps[name]["<="] = ret["<="]
+            deps[name].pop("special", None)
+
+        if ">" in deps[name] and ">=" in deps[name]:
+            if _parse(deps[name][">="]) > _parse(deps[name][">"]):
+                del deps[name][">"]
+            else:
+                del deps[name][">="]
+                deps[name].pop("special", None)
+
+        if "<" in deps[name] and "<=" in deps[name]:
+            if _parse(deps[name]["<="]) < _parse(deps[name]["<"]):
+                del deps[name]["<"]
+                deps[name].pop("special", None)
+            else:
+                del deps[name]["<="]
+
+        if "<" in deps[name]:
+            if ">" in deps[name]:
+                if _parse(deps[name][">"]) >= _parse(deps[name]["<"]):
+                    raise ValueError(f"Restriction clash '{dep}'")
+            if ">=" in deps[name]:
+                if _parse(deps[name][">="]) >= _parse(deps[name]["<"]):
+                    raise ValueError(f"Restriction clash '{dep}'")
+
+        if "<=" in deps[name]:
+            if ">" in deps[name]:
+                if _parse(deps[name][">"]) > _parse(deps[name]["<="]):
+                    raise ValueError(f"Restriction clash '{dep}'")
+            if ">=" in deps[name]:
+                if _parse(deps[name][">="]) >= _parse(deps[name]["<="]):
+                    if _parse(deps[name][">="]) == _parse(deps[name]["<="]):
+                        deps[name] = {"=": deps[name][">="]}
+                    else:
+                        raise ValueError(f"Restriction clash '{dep}'")
 
     for key in deps:
 
-        if ">=" in deps[key] and ">" in deps[key]:
-            if _parse(deps[key][">="]) >= _parse(deps[key][">"]):
-                del deps[key][">"]
-            else:
-                del deps[key][">="]
-
-        if ">=" in deps[key] and ">" in deps[key]:
-            if _parse(deps[key]["<="]) <= _parse(deps[key]["<"]):
-                del deps[key]["<"]
-            else:
-                del deps[key]["<="]
-
-        deps[key]["ret"] = (
-            key + " " + ", ".join([f"{e}{v}" for e, v in deps[key].items()])
-        ).strip(" ")
+        if "special" in deps[key]:
+            deps[key]["ret"] = f"{key} {deps[key]['special']}"
+        else:
+            deps[key]["ret"] = (
+                key
+                + " "
+                + ", ".join(
+                    [f"{e}{deps[key][e]}" for e in ["=", ">=", ">", "<=", "<"] if e in deps[key]]
+                )
+            ).strip(" ")
 
     return [deps[key]["ret"] for key in sorted(deps)]
 
@@ -155,6 +333,7 @@ def conda_envfile_parse(args: list[str]):
         env["dependencies"] = unique(*env["dependencies"])
         with open(filename, "w") as file:
             yaml.dump(env, file)
+
 
 def _conda_envfile_parse_cli():
     conda_envfile_parse(sys.argv[1:])
