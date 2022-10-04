@@ -1,0 +1,7 @@
+- id: conda_merge_envfile
+  name: conda_merge_envfile
+  description: Clean conda environment file
+  minimum_pre_commit_version: 2.1.0
+  entry: conda_merge_envfile --format
+  language: python
+  types: [yaml]

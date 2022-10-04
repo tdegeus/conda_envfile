@@ -11,42 +11,29 @@ import yaml
 from ._version import version
 
 
-def _conda_merge_envfile_parser():
-    """
-    Return parser for :py:func:`conda_merge_envfile`.
-    """
-
-    desc = "Merge YAML environnement files."
-    parser = argparse.ArgumentParser(description=desc)
-    parser.add_argument("-f", "--force", action="store_true", help="Force overwrite output file.")
-    parser.add_argument("-o", "--output", type=str, help="Write to output file.")
-    parser.add_argument("--version", action="version", version=version)
-    parser.add_argument("files", type=str, nargs="*", help="Input files.")
-    return parser
-
-
 def _parse(version):
     return packaging.version.parse(version)
 
 
-def conda_merge_envfile(args: list[str]):
+def parse_file(*args: list[str]) -> dict:
     """
-    Command-line tool to print datasets from a file, see ``--help``.
-    :param args: Command-line arguments (should be all strings).
+    Parse one or more files and return the raw result.
+
+    :param args: List of filenames to parse.
+    :return: Raw result.
     """
-
-    parser = _conda_merge_envfile_parser()
-    args = parser.parse_args(args)
-
-    # parse
 
     env = {"name": [], "channels": [], "dependencies": []}
 
-    for filename in args.files:
+    for filename in args:
+
         if not os.path.isfile(filename):
             raise FileNotFoundError(filename)
+
         with open(filename) as file:
+
             data = yaml.load(file.read(), Loader=yaml.FullLoader)
+
             for key, value in data.items():
                 if key not in env:
                     raise ValueError(f"Unknown key '{key}' in '{filename}'.")
@@ -59,8 +46,6 @@ def conda_merge_envfile(args: list[str]):
         if "channels" in env:
             env["channels"] = list(set(env["channels"]))
 
-    # treat name
-
     if len(env["name"]) > 1:
         raise ValueError("Multiple 'name' keys.")
     if len(env["name"]) == 1:
@@ -68,74 +53,119 @@ def conda_merge_envfile(args: list[str]):
     else:
         del env["name"]
 
-    # treat dependencies
+    return env
 
-    if "dependencies" in env:
+def unique(*args) -> list[str]:
+    """
+    Return a list of unique dependencies.
 
-        deps = {}
+    :param args: Dependencies to merge.
+    :return: List of unique dependencies.
+    """
 
-        for dep in env["dependencies"]:
+    deps = {}
 
-            dep = re.split("#", dep)
+    for dep in args:
 
-            if len(dep) > 1:
-                dep, comment = dep
-                warnings.warn(f"Comment '{comment}' ignored.", Warning)
-            else:
-                dep = dep[0]
+        dep = re.split("#", dep)
 
-            _, name, _, eq, ver, _ = re.split(r"^([^>^<^=^\s]*)(\s*)([<>=]*)(.*)$", dep)
-            eq2 = None
-            ver2 = None
-            sp = re.split(r"^([^,]*)(,)(\s*)([<>=]*)(.*)$", ver)
-            if len(sp) > 1:
-                _, ver, _, _, eq2, ver2, _ = sp
+        if len(dep) > 1:
+            dep, comment = dep
+            warnings.warn(f"Comment '{comment}' ignored.", Warning)
+        else:
+            dep = dep[0]
 
-            ret = {}
+        _, name, _, eq, ver, _ = re.split(r"^([^>^<^=^\s]*)(\s*)([<>=]*)(.*)$", dep)
+        eq2 = None
+        ver2 = None
+        sp = re.split(r"^([^,]*)(,)(\s*)([<>=]*)(.*)$", ver)
+        if len(sp) > 1:
+            _, ver, _, _, eq2, ver2, _ = sp
 
-            if eq == "=" and eq2:
-                raise ValueError(f"Cannot have two equalities in '{dep}'")
-            if eq in [">=", ">"] and eq2 in [">=", ">"]:
-                raise ValueError(f"Illegal bound in '{dep}'")
+        ret = {}
 
-            for a, b in [(eq, ver), (eq2, ver2)]:
-                if not a:
-                    if b:
-                        raise ValueError(f"Missing equality in '{dep}'")
-                    continue
-                if "*" in b:
-                    raise ValueError(f"WIP: wildcard not yet implemented '{dep}'")
-                ret[a] = b
+        if eq == "=" and eq2:
+            raise ValueError(f"Cannot have two equalities in '{dep}'")
+        if eq in [">=", ">"] and eq2 in [">=", ">"]:
+            raise ValueError(f"Illegal bound in '{dep}'")
 
-            if name not in deps:
-                deps[name] = ret
-            else:
-                for key, value in ret.items():
-                    if key in deps[name]:
-                        if _parse(value) > _parse(deps[name][key]):
-                            deps[name][key] = value
-                    else:
+        for a, b in [(eq, ver), (eq2, ver2)]:
+            if not a:
+                if b:
+                    raise ValueError(f"Missing equality in '{dep}'")
+                continue
+            if "*" in b:
+                raise ValueError(f"WIP: wildcard not yet implemented '{dep}'")
+            ret[a] = b
+
+        if name not in deps:
+            deps[name] = ret
+        else:
+            for key, value in ret.items():
+                if key in deps[name]:
+                    if _parse(value) > _parse(deps[name][key]):
                         deps[name][key] = value
-
-        for key in deps:
-
-            if ">=" in deps[key] and ">" in deps[key]:
-                if _parse(deps[key][">="]) >= _parse(deps[key][">"]):
-                    del deps[key][">"]
                 else:
-                    del deps[key][">="]
+                    deps[name][key] = value
 
-            if ">=" in deps[key] and ">" in deps[key]:
-                if _parse(deps[key]["<="]) <= _parse(deps[key]["<"]):
-                    del deps[key]["<"]
-                else:
-                    del deps[key]["<="]
+    for key in deps:
 
-            deps[key]["ret"] = (
-                key + " " + ", ".join([f"{e}{v}" for e, v in deps[key].items()])
-            ).strip(" ")
+        if ">=" in deps[key] and ">" in deps[key]:
+            if _parse(deps[key][">="]) >= _parse(deps[key][">"]):
+                del deps[key][">"]
+            else:
+                del deps[key][">="]
 
-        env["dependencies"] = [deps[key]["ret"] for key in sorted(deps)]
+        if ">=" in deps[key] and ">" in deps[key]:
+            if _parse(deps[key]["<="]) <= _parse(deps[key]["<"]):
+                del deps[key]["<"]
+            else:
+                del deps[key]["<="]
+
+        deps[key]["ret"] = (
+            key + " " + ", ".join([f"{e}{v}" for e, v in deps[key].items()])
+        ).strip(" ")
+
+    return [deps[key]["ret"] for key in sorted(deps)]
+
+
+
+def _conda_merge_envfile_parser():
+    """
+    Return parser for :py:func:`conda_merge_envfile`.
+    """
+
+    desc = "Merge YAML environnement files."
+    parser = argparse.ArgumentParser(description=desc)
+    parser.add_argument("-f", "--force", action="store_true", help="Force overwrite output file.")
+    parser.add_argument("-o", "--output", type=str, help="Write to output file.")
+    parser.add_argument("--format", action="store_true", help="Format files in place.")
+    parser.add_argument("--version", action="version", version=version)
+    parser.add_argument("files", type=str, nargs="*", help="Input files.")
+    return parser
+
+
+def conda_merge_envfile(args: list[str]):
+    """
+    Command-line tool to print datasets from a file, see ``--help``.
+    :param args: Command-line arguments (should be all strings).
+    """
+
+    parser = _conda_merge_envfile_parser()
+    args = parser.parse_args(args)
+
+    if args.format:
+        if args.output:
+            raise ValueError("Cannot use --format and --output together.")
+        for filename in args.files:
+            env = parse_file(filename)
+            env["dependencies"] = unique(*env["dependencies"])
+            with open(filename, "w") as file:
+                yaml.dump(env, file)
+        return 0
+
+    env = parse_file(*args.files)
+    env["dependencies"] = unique(*env["dependencies"])
 
     if not args.output:
         print(yaml.dump(env, default_flow_style=False, default_style="").strip())
