@@ -38,5 +38,4 @@ jobs:
       run: python -m pip install .
 
     - name: Run tests
-      working-directory: test
-      run: python -m unittest discover . -v
+      run: python -m unittest discover tests -v
