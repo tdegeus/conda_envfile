@@ -1,3 +1,11 @@
+[![ci](https://github.com/tdegeus/conda_envfile/workflows/CI/badge.svg)](https://github.com/tdegeus/conda_envfile/actions)
+[![Documentation Status](https://readthedocs.org/projects/conda_envfile/badge/?version=latest)](https://conda_envfile.readthedocs.io/en/latest/?badge=latest)
+[![pre-commit](https://github.com/tdegeus/conda_envfile/workflows/pre-commit/badge.svg)](https://github.com/tdegeus/conda_envfile/actions)
+[![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](https://github.com/pre-commit/pre-commit)
+[![Conda Version](https://img.shields.io/conda/vn/conda-forge/conda_envfile.svg)](https://anaconda.org/conda-forge/conda_envfile)
+
+**Documentation: [https://conda_envfile.readthedocs.io](conda_envfile.readthedocs.io)**
+
 # conda_envfile
 
 Provides a Python library, command line tools, and pre-commit tools to manage conda environment files.
