@@ -3,6 +3,7 @@ import os
 import re
 import sys
 import warnings
+from collections import defaultdict
 
 import click
 import packaging.version
@@ -235,6 +236,11 @@ def _merge(*args) -> dict:
     a = {**args[0]}
     b = {**args[1]}
 
+    if a == {}:
+        return b
+    if b == {}:
+        return b
+
     assert a["name"] == b["name"]
 
     if "special" in a and "special" in b:
@@ -293,7 +299,7 @@ def _merge(*args) -> dict:
     return _check_legal(ret)
 
 
-def interpret(dependency: str) -> dict:
+def _interpret(dependency: str) -> dict:
     """
     Interpret a version string.
 
@@ -308,7 +314,14 @@ def interpret(dependency: str) -> dict:
         <  # version range (if used)
     """
 
+    if dependency is None:
+        return {}
+
     dep = dependency
+
+    if "#" in dep:
+        dep, comment = dep.split("#", 1)
+        warnings.warn(f"Comment '{comment}' ignored.", Warning)
 
     # foo *
 
@@ -380,46 +393,78 @@ def interpret(dependency: str) -> dict:
     return _check_legal(ret)
 
 
+class Specifier:
+    """
+    Interpret a package specifier, e.g.::
+
+        foo
+        foo *
+        foo =1.*
+        for >1.0
+        for <2.0
+        for >=1.0
+        for <=1.0
+        foo >=1.0, <2.0
+
+    To combine multiple specifiers in the most restrictive one::
+
+        str(Specifier("foo") + Specifier("foo =1.*") + Specifier("foo >1.0, <2.0"))
+
+    with results in::
+
+        "foo >1.0, <2.0"
+    """
+
+    def __init__(self, text: str = None):
+        self.data = _interpret(text)
+
+    @property
+    def name(self) -> str:
+        return self.data["name"]
+
+    def __str__(self):
+
+        if "special" in self.data:
+            return f"{self.data['name']} {self.data['special']}"
+        else:
+            return (
+                self.data["name"]
+                + " "
+                + ", ".join(
+                    [f"{e}{self.data[e]}" for e in ["=", ">=", ">", "<=", "<"] if e in self.data]
+                )
+            ).strip(" ")
+
+    def __iadd__(self, other):
+        self.data = _merge(self.data, other.data)
+        return self
+
+    def __add__(self, other):
+        self.data = _merge(self.data, other.data)
+        return self
+
+    def __concat__(self, other):
+        self.data = _merge(self.data, other.data)
+        return self
+
+    def samename(self, other):
+        return self.data["name"] == other.data["name"]
+
+
 def remove(dependencies: list[str], *args: list[str]) -> list[str]:
     """
     Remove dependencies.
 
     :param dependencies: List of dependencies.
-    :param args: List of dependencies to remove.
+    :param args: List of dependencies to remove (version specification is ignored).
     :return: List of dependencies.
     """
 
     ret = []
+    rm = [Specifier(i).name for i in args]
 
     for dep in dependencies:
-
-        dep = re.split("#", dep)[0]
-
-        # foo *
-
-        if re.match(r"^([^\*^\s]*)(\s*)(\*)$", dep):
-            name = re.split(r"^([^\*^\s]*)(\s*)(\*)$", dep)[1]
-
-        # foo =1.0.*
-
-        elif re.match(r"^([^=^\s]*)(\s*)([=]*)([^\*]*)(\*)$", dep):
-            name = re.split(r"^([^=^\s]*)(\s*)([=]*)([^\*]*)(\*)$", dep)[1]
-
-        # foo
-        # foo =1.0
-        # foo >1.0
-        # foo >=1.0
-        # foo <1.0
-        # foo <=1.0
-        # foo >1.0, <2.0
-        # foo >=1.0, <2.0
-        # foo >1.0, <=2.0
-        # foo >=1.0, <=2.0
-
-        else:
-            name = re.split(r"^([^>^<^=^\s]*)(\s*)([<>=]*)(.*)$", dep)[1]
-
-        if name not in args:
+        if Specifier(dep).name not in rm:
             ret.append(dep)
 
     return ret
@@ -427,41 +472,20 @@ def remove(dependencies: list[str], *args: list[str]) -> list[str]:
 
 def unique(*args) -> list[str]:
     """
-    Return a list of unique dependencies.
+    Return a list of 'unique' dependencies. If multiple dependencies with the same name are given,
+    the most restrictive version specification is returned.
 
     :param args: Dependencies to merge.
     :return: List of unique dependencies.
     """
 
-    deps = {}
+    deps = defaultdict(Specifier)
 
     for dep in args:
+        dep = Specifier(dep)
+        deps[dep.name] += dep
 
-        if "#" in dep:
-            dep, comment = dep.split("#", 1)
-            warnings.warn(f"Comment '{comment}' ignored.", Warning)
-
-        dep = interpret(dep)
-
-        if dep["name"] in deps:
-            deps[dep["name"]] = _merge(deps[dep["name"]], dep)
-        else:
-            deps[dep["name"]] = dep
-
-    for key in deps:
-
-        if "special" in deps[key]:
-            deps[key]["ret"] = f"{key} {deps[key]['special']}"
-        else:
-            deps[key]["ret"] = (
-                key
-                + " "
-                + ", ".join(
-                    [f"{e}{deps[key][e]}" for e in ["=", ">=", ">", "<=", "<"] if e in deps[key]]
-                )
-            ).strip(" ")
-
-    return [deps[key]["ret"] for key in sorted(deps)]
+    return [str(deps[key]) for key in sorted(deps)]
 
 
 def _conda_envfile_parse_parser():

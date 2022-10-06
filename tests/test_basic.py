@@ -7,42 +7,24 @@ class Test(unittest.TestCase):
     """ """
 
     def test_interpret(self):
-        self.assertEqual(
-            conda_envfile.interpret("foo"),
-            {"name": "foo"},
-        )
-        self.assertEqual(
-            conda_envfile.interpret("foo >1.0"),
-            {"name": "foo", ">": "1.0"},
-        )
-        self.assertEqual(
-            conda_envfile.interpret("foo >=1.0"),
-            {"name": "foo", ">=": "1.0"},
-        )
-        self.assertEqual(
-            conda_envfile.interpret("foo >=1.0, <2.0"),
-            {"name": "foo", ">=": "1.0", "<": "2.0"},
-        )
-        self.assertEqual(
-            conda_envfile.interpret("foo >=1.0, <=2.0"),
-            {"name": "foo", ">=": "1.0", "<=": "2.0"},
-        )
-        self.assertEqual(
-            conda_envfile.interpret("foo >1.0, <2.0"),
-            {"name": "foo", ">": "1.0", "<": "2.0"},
-        )
-        self.assertEqual(
-            conda_envfile.interpret("foo >1.0, <=2.0"),
-            {"name": "foo", ">": "1.0", "<=": "2.0"},
-        )
-        self.assertEqual(
-            conda_envfile.interpret("foo =1.0.*"),
-            {"name": "foo", ">=": "1.0.0", "<": "1.1.0", "special": "=1.0.*"},
-        )
+
+        interpret = [
+            "foo",
+            "foo >1.0",
+            "foo >=1.0",
+            "foo >=1.0, <2.0",
+            "foo >=1.0, <=2.0",
+            "foo >1.0, <2.0",
+            "foo >1.0, <=2.0",
+            "foo =1.0.*",
+        ]
+
+        for name in interpret:
+            self.assertEqual(str(conda_envfile.Specifier(name)), name)
 
         self.assertEqual(
-            conda_envfile.interpret("foo >=1.2.0, <=1.2.0"),
-            {"name": "foo", "=": "1.2.0"},
+            str(conda_envfile.Specifier("foo >=1.2.0, <=1.2.0")),
+            "foo =1.2.0",
         )
 
         illegal = [
@@ -54,7 +36,7 @@ class Test(unittest.TestCase):
 
         for dep in illegal:
             with self.assertRaises(ValueError):
-                conda_envfile.interpret(dep)
+                conda_envfile.Specifier(dep)
 
     def test_unique(self):
 
