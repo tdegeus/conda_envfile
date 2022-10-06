@@ -125,6 +125,10 @@ class Test(unittest.TestCase):
         self.assertEqual(conda_envfile.remove(["foo =1.*", "bar =1.*"], "bar"), ["foo =1.*"])
         self.assertEqual(conda_envfile.remove(["foo >1.0", "bar >1.0"], "bar"), ["foo >1.0"])
 
+    def test_restrict(self):
+
+        self.assertEqual(conda_envfile.restrict(["foo", "bar"], ["foo >1.0"]), ["foo >1.0", "bar"])
+
 
 if __name__ == "__main__":
 

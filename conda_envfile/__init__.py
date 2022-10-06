@@ -488,6 +488,35 @@ def unique(*args) -> list[str]:
     return [str(deps[key]) for key in sorted(deps)]
 
 
+def restrict(source, other: list[str] = None) -> list[str]:
+    """
+    Restrict all dependencies in ``source`` to the most restrictive version specification in
+    ``source`` and ``other``. All dependencies that are in ``other`` but not in ``source`` are
+    ignored. In instead you want to integrate them, use :py:func:`unique`::
+
+        merged = unique(*source, *other)
+
+    :param source: List of dependencies.
+    :param other: List of other dependencies.
+    :return: List of dependencies.
+    """
+
+    deps = defaultdict(Specifier)
+
+    for dep in unique(*other):
+        dep = Specifier(dep)
+        deps[dep.name] += dep
+
+    ret = [i for i in source]
+
+    for i in range(len(ret)):
+        dep = Specifier(ret[i])
+        if dep.name in deps:
+            ret[i] = str(dep + deps[dep.name])
+
+    return ret
+
+
 def _conda_envfile_parse_parser():
     """
     Return parser for :py:func:`conda_envfile_parse`.
@@ -573,3 +602,95 @@ def conda_envfile_merge(args: list[str]):
 
 def _conda_envfile_merge_cli():
     conda_envfile_merge(sys.argv[1:])
+
+
+def _conda_envfile_restrict_parser():
+    """
+    Return parser for :py:func:`conda_envfile_restrict`.
+    """
+
+    desc = """
+    Restrict version of packages based on another YAML file. Example::
+
+        conda_envfile_restrict env1.yml env2.yml > env3.yml
+
+    To check conda-forge recipes, use::
+
+        conda_envfile_restrict --conda meta.yml env2.yml
+
+    In this case, this function only checks and outputs a ``1`` return code if the conda file
+    is not restrictive enough.
+    """
+    parser = argparse.ArgumentParser(description=desc)
+    parser.add_argument("-f", "--force", action="store_true", help="Force overwrite output file.")
+    parser.add_argument("-o", "--output", type=str, help="Write to output file.")
+    parser.add_argument("-c", "--conda", type=str, action="append", help="Interpret as conda file.")
+    parser.add_argument("-a", "--append", type=str, action="append", help="Append dependencies.")
+    parser.add_argument("--version", action="version", version=version)
+    parser.add_argument("source", type=str, nargs="?", help="Input file.")
+    parser.add_argument("comparison", type=str, nargs="*", help="Comparison file(s).")
+    return parser
+
+
+def conda_envfile_restrict(args: list[str]):
+    """
+    Command-line tool to print datasets from a file, see ``--help``.
+    :param args: Command-line arguments (should be all strings).
+    """
+
+    parser = _conda_envfile_restrict_parser()
+    args = parser.parse_args(args)
+
+    if args.append is None:
+        args.append = []
+
+    if len(args.conda) > 0:
+        other = []
+        with open(args.conda[0]) as file:
+            source = unique(*condaforge_dependencies(file.read()))
+        if args.source:
+            other += parse_file(args.source)["dependencies"]
+        for filename in args.comparison:
+            other += parse_file(filename)["dependencies"]
+        for filename in args.conda[1:]:
+            with open(filename) as file:
+                other += condaforge_dependencies(file.read())
+        ret = restrict(source, unique(*(other + args.append)))
+        if ret != source:
+            print("Difference found")
+            print("\n".join([i for i in ret if i not in source]))
+            return 1
+        else:
+            return 0
+
+    env = parse_file(args.source)
+
+    other = []
+    for filename in args.comparison:
+        other += parse_file(filename)["dependencies"]
+
+    env["dependencies"] = restrict(source, unique(*(other + args.append)))
+
+    if not args.output:
+        print(yaml.dump(env, default_flow_style=False, default_style="").strip())
+        return 0
+
+    dirname = os.path.dirname(args.output)
+
+    if not args.force:
+        if os.path.isfile(args.output):
+            if not click.confirm(f'Overwrite "{args.output:s}"?'):
+                raise OSError("Cancelled")
+        elif not os.path.isdir(dirname) and len(dirname) > 0:
+            if not click.confirm(f'Create "{os.path.dirname(args.output):s}"?'):
+                raise OSError("Cancelled")
+
+    if not os.path.isdir(dirname) and len(dirname) > 0:
+        os.makedirs(os.path.dirname(args.output))
+
+    with open(args.output, "w") as file:
+        yaml.dump(env, file)
+
+
+def _conda_envfile_restrict_cli():
+    conda_envfile_restrict(sys.argv[1:])

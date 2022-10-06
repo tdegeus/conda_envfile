@@ -26,6 +26,7 @@ setup(
         "console_scripts": [
             f"conda_envfile_merge = {project_name}:_conda_envfile_merge_cli",
             f"conda_envfile_parse = {project_name}:_conda_envfile_parse_cli",
+            f"conda_envfile_restrict = {project_name}:_conda_envfile_restrict_cli",
         ]
     },
 )
