@@ -123,16 +123,18 @@ class Test(unittest.TestCase):
                 self.assertEqual(conda_envfile.unique(*deps), expected)
 
         illegal = [
-            ["foo >1.2.0", "foo <1.2.0"],
-            ["foo =1.2.*", "foo >=1.3.0"],
-            ["foo =1.2.*", "foo <1.2.0"],
-            ["foo >=1.2.0, <1.3.0", "foo >=1.3.0"],
-            ["foo >=1.2.0, <2", "foo >=1.3.0", "foo >=2.0.0"],
+            ["foo >1.2.0", "foo <1.2.0", "foo", "foo *", "foo =1.2.*"],
+            ["foo =1.2.*", "foo >=1.3.0", "foo 1.*"],
+            ["foo =1.2.*", "foo <1.2.0", "foo", "foo *"],
+            ["foo >=1.2.0, <1.3.0", "foo >=1.3.0", "foo"],
+            ["foo >=1.2.0, <2", "foo >=1.3.0", "foo >=2.0.0", "foo"],
         ]
 
         for deps in illegal:
-            with self.assertRaises(ValueError):
-                conda_envfile.unique(*deps)
+            for _ in range(len(deps)):
+                deps.append(deps.pop(0))
+                with self.assertRaises(ValueError):
+                    conda_envfile.unique(*deps)
 
     def test_remove(self):
 
