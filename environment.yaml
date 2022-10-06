@@ -3,6 +3,7 @@ channels:
 dependencies:
 - click
 - furo
+- jinja2
 - packaging
 - pre-commit
 - python

@@ -1,0 +1,79 @@
+{% set name = "GooseBib" %}
+{% set org = "tdegeus" %}
+{% set version = "0.6.2" %}
+
+package:
+  name: {{ name|lower }}
+  version: {{ version }}
+
+source:
+  url: https://github.com/{{ org }}/{{ name }}/archive/v{{ version }}.tar.gz
+  sha256: 40096b18a0bc76d59c9b9c63165db6bc30a07bb06f36c71db68429d12ab31678
+
+build:
+  number: 0
+  noarch: python
+  script_env: SETUPTOOLS_SCM_PRETEND_VERSION={{ version }}
+  script: {{ PYTHON }} -m pip install . -vv
+  entry_points:
+    - GbibClean = {{ name }}.bibtex:GbibClean
+    - GbibDiscover = {{ name }}.bibtex:GbibDiscover
+    - GbibCheckAuthors = {{ name }}.cli.GbibCheckAuthors:main
+    - GbibCheckKeys = {{ name }}.cli.GbibCheckKeys:main
+    - GbibCheckLink = {{ name }}.cli.GbibCheckLink:main
+    - GbibList = {{ name }}.cli.GbibList:main
+    - GbibParse = {{ name }}.cli.GbibParse:main
+    - GbibSelect = {{ name }}.cli.GbibSelect:main
+    - GbibSelectAlias = {{ name }}.cli.GbibSelectAlias:main
+    - GbibShowAuthorRename = {{ name }}.bibtex:GbibShowAuthorRename
+
+requirements:
+  host:
+    - pip
+    - python >=3
+    - setuptools_scm
+  run:
+    - arxiv
+    - bibtexparser
+    - click
+    - docopt
+    - gitpython
+    - numpy
+    - python >=3
+    - pyyaml
+    - requests
+    - tqdm
+
+test:
+  requires:
+    - git
+    - pip
+  imports:
+    - {{ name }}
+  commands:
+    - pip check
+    - python -c "import {{ name }}; print({{ name }}.version)"
+    - GbibClean --version | grep {{ version }}
+    - GbibDiscover --version | grep {{ version }}
+    - GbibCheckAuthors --help
+    - GbibCheckKeys --help
+    - GbibCheckLink --help
+    - GbibList --help
+    - GbibParse --help
+    - GbibSelect --help
+    - GbibSelectAlias --help
+    - GbibShowAuthorRename --help
+
+about:
+  home: https://github.com/{{ org }}/{{ name }}
+  license: MIT
+  license_family: MIT
+  license_file: LICENSE
+  summary: Simple command-line tools to clean-up BibTeX files.
+  description: Simple command-line tools to clean-up BibTeX files.
+  doc_url: https://github.com/{{ org }}/{{ name }}
+  dev_url: https://github.com/{{ org }}/{{ name }}
+
+extra:
+  recipe-maintainers:
+    - tdegeus

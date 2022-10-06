@@ -62,3 +62,8 @@ class Test(unittest.TestCase):
         self.assertEqual(conda_envfile.remove(["foo *", "bar *"], "bar"), ["foo *"])
         self.assertEqual(conda_envfile.remove(["foo =1.*", "bar =1.*"], "bar"), ["foo =1.*"])
         self.assertEqual(conda_envfile.remove(["foo >1.0", "bar >1.0"], "bar"), ["foo >1.0"])
+
+
+if __name__ == "__main__":
+
+    unittest.main(verbosity=2)
