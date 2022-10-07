@@ -21,7 +21,7 @@ setup(
     packages=find_packages(exclude=["tests"]),
     use_scm_version={"write_to": f"{project_name}/_version.py"},
     setup_requires=["setuptools_scm"],
-    install_requires=["click", "packaging", "pyyaml"],
+    install_requires=["click", "packaging", "pyyaml", "Jinja2"],
     entry_points={
         "console_scripts": [
             f"conda_envfile_merge = {project_name}:_conda_envfile_merge_cli",
