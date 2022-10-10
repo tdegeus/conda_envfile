@@ -4,8 +4,10 @@ import re
 import sys
 import warnings
 from collections import defaultdict
+from functools import singledispatch
 
 import click
+import packaging.specifiers
 import packaging.version
 import yaml
 from jinja2 import BaseLoader
@@ -393,7 +395,7 @@ def _interpret(dependency: str) -> dict:
     return _check_legal(ret)
 
 
-class Specifier:
+class PackageSpecifier:
     """
     Interpret a package specifier, e.g.::
 
@@ -408,11 +410,14 @@ class Specifier:
 
     To combine multiple specifiers in the most restrictive one::
 
-        str(Specifier("foo") + Specifier("foo =1.*") + Specifier("foo >1.0, <2.0"))
-
-    with results in::
-
+        >>> print(PackageSpecifier("foo") + PackageSpecifier("foo >1.0, <2.0"))
         "foo >1.0, <2.0"
+
+        >>> print(PackageSpecifier("foo =1.*") + PackageSpecifier("foo >1.0, <2.0"))
+        "foo >1.0, <2.0"
+
+        >>> print(PackageSpecifier("foo =1.*") + PackageSpecifier("foo"))
+        "foo *"
     """
 
     def __init__(self, text: str = None):
@@ -435,6 +440,9 @@ class Specifier:
                 )
             ).strip(" ")
 
+    def __repr__(self) -> str:
+        return str(self)
+
     def __iadd__(self, other):
         self.data = _merge(self.data, other.data)
         return self
@@ -447,8 +455,13 @@ class Specifier:
         self.data = _merge(self.data, other.data)
         return self
 
-    def samename(self, other):
+    @singledispatch
+    def has_same_name(self, other):
         return self.data["name"] == other.data["name"]
+
+    @has_same_name.register(str)
+    def _(self, other):
+        return self.has_same_name(PackageSpecifier(other))
 
 
 def remove(dependencies: list[str], *args: list[str]) -> list[str]:
@@ -461,10 +474,10 @@ def remove(dependencies: list[str], *args: list[str]) -> list[str]:
     """
 
     ret = []
-    rm = [Specifier(i).name for i in args]
+    rm = [PackageSpecifier(i).name for i in args]
 
     for dep in dependencies:
-        if Specifier(dep).name not in rm:
+        if PackageSpecifier(dep).name not in rm:
             ret.append(dep)
 
     return ret
@@ -479,10 +492,10 @@ def unique(*args) -> list[str]:
     :return: List of unique dependencies.
     """
 
-    deps = defaultdict(Specifier)
+    deps = defaultdict(PackageSpecifier)
 
     for dep in args:
-        dep = Specifier(dep)
+        dep = PackageSpecifier(dep)
         deps[dep.name] += dep
 
     return [str(deps[key]) for key in sorted(deps)]
@@ -501,16 +514,16 @@ def restrict(source, other: list[str] = None) -> list[str]:
     :return: List of dependencies.
     """
 
-    deps = defaultdict(Specifier)
+    deps = defaultdict(PackageSpecifier)
 
     for dep in unique(*other):
-        dep = Specifier(dep)
+        dep = PackageSpecifier(dep)
         deps[dep.name] += dep
 
     ret = [i for i in source]
 
     for i in range(len(ret)):
-        dep = Specifier(ret[i])
+        dep = PackageSpecifier(ret[i])
         if dep.name in deps:
             ret[i] = str(dep + deps[dep.name])
 
