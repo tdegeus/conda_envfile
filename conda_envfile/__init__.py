@@ -19,135 +19,6 @@ def _parse(version):
     return packaging.version.parse(version)
 
 
-def condaforge_dependencies(
-    text: str,
-    name: str = None,
-    flatten: bool = True,
-    selectors: list[str] = [],
-    target_platform: str = "myplatform",
-) -> list[str]:
-    """
-    Get the dependencies from a conda-forge feedstock.
-
-    :param name: Name of the recipe to select (use to select one of multi-outputs).
-    :param flatten: Flatten the dependencies, otherwise keep as ``"host"``, ``"run"``, ``"build"``.
-    :param selectors: List of selectors to keep (all non-selected selectors are removed).
-    :param target_platform: Target platform to use to substitute ``{{ target_platform }}``.
-    """
-
-    data = text.replace("{{ compiler('c') }}", "c-compiler")
-    data = data.replace("{{ compiler('cxx') }}", "cxx-compiler")
-    data = data.replace('{{ compiler("c") }}', "c-compiler")
-    data = data.replace('{{ compiler("cxx") }}', "cxx-compiler")
-    rtemplate = Environment(loader=BaseLoader).from_string(data)
-    data = rtemplate.render(target_platform=target_platform)
-
-    data = data.split("\n")
-
-    rm_selectors = [
-        "x86",
-        "x86_64",
-        "linux",
-        "linux32",
-        "linux64",
-        "armv6l",
-        "armv7l",
-        "aarch64",
-        "ppc64le",
-        "osx",
-        "arm64",
-        "unix",
-        "win",
-        "win32",
-        "win64",
-        "py",
-        "py3k",
-        "py2k",
-        "py27",
-        "py34",
-        "py35",
-        "py36",
-        "np",
-        "build_platform",
-        "build_platform != target_platform",
-    ]
-
-    for selector in selectors:
-        rm_selectors.remove(selector)
-
-    for selector in rm_selectors:
-        data = [i for i in data if not re.match(rf"(.*)(# \[{selector}\])(.*)", i)]
-
-    data = yaml.load("\n".join(data), Loader=yaml.FullLoader)
-
-    ret = {key: [] for key in ["host", "run", "build"]}
-
-    if "outputs" in data:
-        for sub in data["outputs"]:
-            if not name or sub["name"] == name:
-                for key in ["host", "run", "build"]:
-                    if key in sub["requirements"]:
-                        ret[key] = sub["requirements"][key]
-    else:
-        for key in ret:
-            if key in data["requirements"]:
-                ret[key] = data["requirements"][key]
-
-    if flatten:
-        out = []
-        for key in ret:
-            out += ret[key]
-        return unique(*out)
-
-    for key in ret:
-        ret[key] = [PackageSpecifier(i) for i in ret[key]]
-
-    return ret
-
-
-def parse_file(*args: list[str]) -> dict:
-    """
-    Parse one or more files and return the raw result.
-
-    :param args: List of filenames to parse.
-    :return: Raw result.
-    """
-
-    env = {"name": [], "channels": [], "dependencies": []}
-
-    for filename in args:
-
-        if not os.path.isfile(filename):
-            raise FileNotFoundError(filename)
-
-        with open(filename) as file:
-
-            data = yaml.load(file.read(), Loader=yaml.FullLoader)
-
-            for key, value in data.items():
-                if key not in env:
-                    raise ValueError(f"Unknown key '{key}' in '{filename}'.")
-                if type(value) == str:
-                    env[key].append(value)
-                elif type(value) == list:
-                    env[key] += value
-
-    for key in ["channels", "name"]:
-        if "channels" in env:
-            env["channels"] = list(set(env["channels"]))
-
-    if len(env["name"]) > 1:
-        raise ValueError("Multiple 'name' keys.")
-    if len(env["name"]) == 1:
-        env["name"] = env["name"][0]
-    else:
-        del env["name"]
-
-    env["dependencies"] = [PackageSpecifier(i) for i in env["dependencies"]]
-
-    return env
-
-
 def _check_legal(dep: dict):
     """
     Check that the dependency is legal, make small simplifications.
@@ -648,6 +519,135 @@ def restrict(source, other: list[str] = None) -> list[PackageSpecifier]:
             ret[i] += deps[dep.name]
 
     return ret
+
+
+def condaforge_dependencies(
+    text: str,
+    name: str = None,
+    flatten: bool = True,
+    selectors: list[str] = [],
+    target_platform: str = "myplatform",
+) -> list[str]:
+    """
+    Get the dependencies from a conda-forge feedstock.
+
+    :param name: Name of the recipe to select (use to select one of multi-outputs).
+    :param flatten: Flatten the dependencies, otherwise keep as ``"host"``, ``"run"``, ``"build"``.
+    :param selectors: List of selectors to keep (all non-selected selectors are removed).
+    :param target_platform: Target platform to use to substitute ``{{ target_platform }}``.
+    """
+
+    data = text.replace("{{ compiler('c') }}", "c-compiler")
+    data = data.replace("{{ compiler('cxx') }}", "cxx-compiler")
+    data = data.replace('{{ compiler("c") }}', "c-compiler")
+    data = data.replace('{{ compiler("cxx") }}', "cxx-compiler")
+    rtemplate = Environment(loader=BaseLoader).from_string(data)
+    data = rtemplate.render(target_platform=target_platform)
+
+    data = data.split("\n")
+
+    rm_selectors = [
+        "x86",
+        "x86_64",
+        "linux",
+        "linux32",
+        "linux64",
+        "armv6l",
+        "armv7l",
+        "aarch64",
+        "ppc64le",
+        "osx",
+        "arm64",
+        "unix",
+        "win",
+        "win32",
+        "win64",
+        "py",
+        "py3k",
+        "py2k",
+        "py27",
+        "py34",
+        "py35",
+        "py36",
+        "np",
+        "build_platform",
+        "build_platform != target_platform",
+    ]
+
+    for selector in selectors:
+        rm_selectors.remove(selector)
+
+    for selector in rm_selectors:
+        data = [i for i in data if not re.match(rf"(.*)(# \[{selector}\])(.*)", i)]
+
+    data = yaml.load("\n".join(data), Loader=yaml.FullLoader)
+
+    ret = {key: [] for key in ["host", "run", "build"]}
+
+    if "outputs" in data:
+        for sub in data["outputs"]:
+            if not name or sub["name"] == name:
+                for key in ["host", "run", "build"]:
+                    if key in sub["requirements"]:
+                        ret[key] = sub["requirements"][key]
+    else:
+        for key in ret:
+            if key in data["requirements"]:
+                ret[key] = data["requirements"][key]
+
+    if flatten:
+        out = []
+        for key in ret:
+            out += ret[key]
+        return unique(*out)
+
+    for key in ret:
+        ret[key] = [PackageSpecifier(i) for i in ret[key]]
+
+    return ret
+
+
+def parse_file(*args: list[str]) -> dict:
+    """
+    Parse one or more files and return the raw result.
+
+    :param args: List of filenames to parse.
+    :return: Raw result.
+    """
+
+    env = {"name": [], "channels": [], "dependencies": []}
+
+    for filename in args:
+
+        if not os.path.isfile(filename):
+            raise FileNotFoundError(filename)
+
+        with open(filename) as file:
+
+            data = yaml.load(file.read(), Loader=yaml.FullLoader)
+
+            for key, value in data.items():
+                if key not in env:
+                    raise ValueError(f"Unknown key '{key}' in '{filename}'.")
+                if type(value) == str:
+                    env[key].append(value)
+                elif type(value) == list:
+                    env[key] += value
+
+    for key in ["channels", "name"]:
+        if "channels" in env:
+            env["channels"] = list(set(env["channels"]))
+
+    if len(env["name"]) > 1:
+        raise ValueError("Multiple 'name' keys.")
+    if len(env["name"]) == 1:
+        env["name"] = env["name"][0]
+    else:
+        del env["name"]
+
+    env["dependencies"] = [PackageSpecifier(i) for i in env["dependencies"]]
+
+    return env
 
 
 def _conda_envfile_parse_parser():
