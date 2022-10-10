@@ -12,7 +12,7 @@ class Test(unittest.TestCase):
     def test_condaforge_dependencies(self):
 
         with open(basedir / "condaforge_multioutput.yaml") as file:
-            deps = conda_envfile.condaforge_dependencies(file.read())
+            deps = list(map(str, conda_envfile.condaforge_dependencies(file.read())))
 
         self.assertEqual(
             deps,
@@ -32,7 +32,7 @@ class Test(unittest.TestCase):
         )
 
         with open(basedir / "condaforge.yaml") as file:
-            deps = conda_envfile.condaforge_dependencies(file.read())
+            deps = list(map(str, conda_envfile.condaforge_dependencies(file.read())))
 
         self.assertEqual(
             deps,
