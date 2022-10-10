@@ -1,10 +1,64 @@
 import unittest
 
+from packaging.version import Version
+
 import conda_envfile
 
 
 class Test(unittest.TestCase):
     """ """
+
+    def test_PackageSpecifier_has_same_name(self):
+
+        self.assertTrue(conda_envfile.PackageSpecifier("foo =1.0").has_same_name("foo"))
+        self.assertTrue(~conda_envfile.PackageSpecifier("foo =1.0").has_same_name("bar"))
+
+    def test_PackageSpecifier_in(self):
+
+        self.assertTrue("foo =1.0" in conda_envfile.PackageSpecifier("foo =1.0"))
+        self.assertTrue("foo >=1.0, <=1.0" in conda_envfile.PackageSpecifier("foo =1.0"))
+        self.assertTrue("foo =1.0" not in conda_envfile.PackageSpecifier("foo =2.0"))
+        self.assertTrue("foo >0.9" not in conda_envfile.PackageSpecifier("foo =1.0"))
+        self.assertTrue("foo <1.1" not in conda_envfile.PackageSpecifier("foo =1.0"))
+        self.assertTrue("foo >0.9, <1.1" not in conda_envfile.PackageSpecifier("foo =1.0"))
+
+        self.assertTrue("foo =1.0" in conda_envfile.PackageSpecifier("foo >=1.0"))
+        self.assertTrue("foo =1.0" in conda_envfile.PackageSpecifier("foo >0.9"))
+
+        self.assertTrue("foo =1.0" in conda_envfile.PackageSpecifier("foo >=1.0, <2.0"))
+        self.assertTrue("foo =1.0" in conda_envfile.PackageSpecifier("foo >=1.0, <=2.0"))
+        self.assertTrue("foo =1.0" in conda_envfile.PackageSpecifier("foo >0.9, <2.0"))
+        self.assertTrue("foo =1.0" in conda_envfile.PackageSpecifier("foo >0.9, <=2.0"))
+
+        self.assertTrue("foo =1.0" not in conda_envfile.PackageSpecifier("foo >1.0"))
+        self.assertTrue("foo =1.0" not in conda_envfile.PackageSpecifier("foo <1.0"))
+
+        self.assertTrue("foo <1.0" in conda_envfile.PackageSpecifier("foo <1.0"))
+        self.assertTrue("foo <0.9" in conda_envfile.PackageSpecifier("foo <1.0"))
+        self.assertTrue("foo <0.9" in conda_envfile.PackageSpecifier("foo <=1.0"))
+        self.assertTrue("foo <=0.9" in conda_envfile.PackageSpecifier("foo <1.0"))
+        self.assertTrue("foo <=0.9" in conda_envfile.PackageSpecifier("foo <=1.0"))
+        self.assertTrue("foo <=1.0" not in conda_envfile.PackageSpecifier("foo <1.0"))
+        self.assertTrue("foo <1.0" not in conda_envfile.PackageSpecifier("foo <=0.9"))
+        self.assertTrue("foo >=1.0" not in conda_envfile.PackageSpecifier("foo >1.0"))
+        self.assertTrue("foo >1.0" not in conda_envfile.PackageSpecifier("foo >=1.1"))
+        self.assertTrue("foo" not in conda_envfile.PackageSpecifier("foo <1.0"))
+
+        self.assertTrue("foo >=0.5, <=1.0" in conda_envfile.PackageSpecifier("foo <2.0"))
+        self.assertTrue("foo >0.5, <=1.0" in conda_envfile.PackageSpecifier("foo <2.0"))
+        self.assertTrue("foo >0.5, <1.0" in conda_envfile.PackageSpecifier("foo <1.0"))
+        self.assertTrue("foo <1.0" not in conda_envfile.PackageSpecifier("foo >0.5, <1.0"))
+        self.assertTrue("foo <1.0" not in conda_envfile.PackageSpecifier("foo >0.5, <=1.0"))
+        self.assertTrue("foo <1.0" not in conda_envfile.PackageSpecifier("foo >=0.5, <1.0"))
+        self.assertTrue("foo <1.0" not in conda_envfile.PackageSpecifier("foo >=0.5, <=1.0"))
+
+        self.assertTrue("foo *" in conda_envfile.PackageSpecifier("foo"))
+        self.assertTrue("foo =1.*" in conda_envfile.PackageSpecifier("foo >=1.0, <2.0"))
+        self.assertTrue("foo =1.*" not in conda_envfile.PackageSpecifier("foo >1.0, <2.0"))
+
+    def test_PackageSpecifier_in_overload(self):
+
+        self.assertTrue(Version("1.0") in conda_envfile.PackageSpecifier("foo =1.0"))
 
     def test_interpret(self):
 
@@ -20,11 +74,11 @@ class Test(unittest.TestCase):
         ]
 
         for name in interpret:
-            self.assertEqual(str(conda_envfile.Specifier(name)), name)
-            self.assertEqual(str(conda_envfile.Specifier(name.replace(" ", ""))), name)
+            self.assertEqual(str(conda_envfile.PackageSpecifier(name)), name)
+            self.assertEqual(str(conda_envfile.PackageSpecifier(name.replace(" ", ""))), name)
 
         self.assertEqual(
-            str(conda_envfile.Specifier("foo >=1.2.0, <=1.2.0")),
+            str(conda_envfile.PackageSpecifier("foo >=1.2.0, <=1.2.0")),
             "foo =1.2.0",
         )
 
@@ -37,7 +91,7 @@ class Test(unittest.TestCase):
 
         for dep in illegal:
             with self.assertRaises(ValueError):
-                conda_envfile.Specifier(dep)
+                conda_envfile.PackageSpecifier(dep)
 
     def test_unique(self):
 
