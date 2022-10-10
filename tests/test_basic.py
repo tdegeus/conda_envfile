@@ -60,6 +60,11 @@ class Test(unittest.TestCase):
         self.assertTrue("foo =1.0" in conda_envfile.PackageSpecifier("foo >0.9, <2.0"))
         self.assertTrue("foo =1.0" in conda_envfile.PackageSpecifier("foo >0.9, <=2.0"))
 
+        self.assertTrue("foo >=1.0, <2.0" not in conda_envfile.PackageSpecifier("foo =1.0"))
+        self.assertTrue("foo >=1.0, <=2.0" not in conda_envfile.PackageSpecifier("foo =1.0"))
+        self.assertTrue("foo >0.9, <2.0" not in conda_envfile.PackageSpecifier("foo =1.0"))
+        self.assertTrue("foo >0.9, <=2.0" not in conda_envfile.PackageSpecifier("foo =1.0"))
+
         self.assertTrue("foo =1.0" not in conda_envfile.PackageSpecifier("foo >1.0"))
         self.assertTrue("foo =1.0" not in conda_envfile.PackageSpecifier("foo <1.0"))
 
@@ -213,6 +218,15 @@ class Test(unittest.TestCase):
         self.assertEqual(conda_envfile.remove(["foo *", "bar *"], "bar"), ["foo *"])
         self.assertEqual(conda_envfile.remove(["foo =1.*", "bar =1.*"], "bar"), ["foo =1.*"])
         self.assertEqual(conda_envfile.remove(["foo >1.0", "bar >1.0"], "bar"), ["foo >1.0"])
+
+    def test_contains(self):
+
+        requirements = ["foo >1.0", "bar >=2.0"]
+        installed = ["foo=2.0=generic", "bar=3.0=generic", "other"]
+        self.assertTrue(conda_envfile.contains(requirements, installed))
+
+        installed = ["foo=2.0=generic", "bar=1.0=generic", "other"]
+        self.assertFalse(conda_envfile.contains(requirements, installed))
 
     def test_restrict(self):
 

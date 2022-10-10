@@ -521,6 +521,26 @@ def restrict(source, other: list[str] = None) -> list[PackageSpecifier]:
     return ret
 
 
+def contains(requirements: list[PackageSpecifier], installed: list[PackageSpecifier]) -> bool:
+    """
+    Check if all dependencies in ``requirements`` are satisfied by ``installed``.
+
+    :param requirements: List of requirements.
+    :param install: List of 'installed' dependencies.
+    :return: True if all requirements are satisfied, False otherwise.
+    """
+
+    installed = {i.name: i for i in map(PackageSpecifier, installed)}
+
+    for req in map(PackageSpecifier, requirements):
+        if req.name not in installed:
+            return False
+        if installed[req.name] not in req:
+            return False
+
+    return True
+
+
 def condaforge_dependencies(
     text: str,
     name: str = None,
