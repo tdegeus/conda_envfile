@@ -187,8 +187,9 @@ class Test(unittest.TestCase):
         for deps, expect in dependencies:
             for _ in range(len(deps)):
                 deps.append(deps.pop(0))
-                self.assertEqual(conda_envfile.unique(*deps), expect)
-                self.assertEqual(conda_envfile.unique(*[i.replace(" ", "") for i in deps]), expect)
+                nospace = [i.replace(" ", "") for i in deps]
+                self.assertEqual(list(map(str, conda_envfile.unique(*deps))), expect)
+                self.assertEqual(list(map(str, conda_envfile.unique(*nospace))), expect)
 
         illegal = [
             ["foo >1.2.0", "foo <1.2.0", "foo", "foo *", "foo =1.2.*"],
@@ -215,7 +216,15 @@ class Test(unittest.TestCase):
 
     def test_restrict(self):
 
-        self.assertEqual(conda_envfile.restrict(["foo", "bar"], ["foo >1.0"]), ["foo >1.0", "bar"])
+        self.assertEqual(
+            list(map(str, conda_envfile.restrict(["foo", "bar"], ["foo >1.0"]))),
+            ["foo >1.0", "bar"],
+        )
+
+        self.assertEqual(
+            conda_envfile.restrict(["foo", "bar"], ["foo >1.0"]),
+            list(map(conda_envfile.PackageSpecifier, ["foo >1.0", "bar"])),
+        )
 
 
 if __name__ == "__main__":

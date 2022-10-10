@@ -99,6 +99,9 @@ def condaforge_dependencies(
             out += ret[key]
         return unique(*out)
 
+    for key in ret:
+        ret[key] = [PackageSpecifier(i) for i in ret[key]]
+
     return ret
 
 
@@ -139,6 +142,8 @@ def parse_file(*args: list[str]) -> dict:
         env["name"] = env["name"][0]
     else:
         del env["name"]
+
+    env["dependencies"] = [PackageSpecifier(i) for i in env["dependencies"]]
 
     return env
 
@@ -438,7 +443,10 @@ class PackageSpecifier:
     """
 
     def __init__(self, text: str = None):
-        self.data = _interpret(text)
+        if type(text) == PackageSpecifier:
+            self.data = {**text.data}
+        else:
+            self.data = _interpret(text)
 
     @property
     def name(self) -> str:
@@ -469,6 +477,9 @@ class PackageSpecifier:
         if "wildcard" in self.data:
             return self.data["wildcard"]
         return self.version_range
+
+    def __eq__(self, other) -> bool:
+        return self.data == other.data
 
     def __str__(self):
 
@@ -593,13 +604,13 @@ def remove(dependencies: list[str], *args: list[str]) -> list[str]:
     return ret
 
 
-def unique(*args) -> list[str]:
+def unique(*args) -> list[PackageSpecifier]:
     """
     Return a list of 'unique' dependencies. If multiple dependencies with the same name are given,
     the most restrictive version specification is returned.
 
     :param args: Dependencies to merge.
-    :return: List of unique dependencies.
+    :return: List of unique dependencies (convert to strings: ``list(map(str, unique(*args)))``)
     """
 
     deps = defaultdict(PackageSpecifier)
@@ -608,10 +619,10 @@ def unique(*args) -> list[str]:
         dep = PackageSpecifier(dep)
         deps[dep.name] += dep
 
-    return [str(deps[key]) for key in sorted(deps)]
+    return [deps[key] for key in sorted(deps)]
 
 
-def restrict(source, other: list[str] = None) -> list[str]:
+def restrict(source, other: list[str] = None) -> list[PackageSpecifier]:
     """
     Restrict all dependencies in ``source`` to the most restrictive version specification in
     ``source`` and ``other``. All dependencies that are in ``other`` but not in ``source`` are
@@ -630,12 +641,11 @@ def restrict(source, other: list[str] = None) -> list[str]:
         dep = PackageSpecifier(dep)
         deps[dep.name] += dep
 
-    ret = [i for i in source]
+    ret = [PackageSpecifier(i) for i in source]
 
     for i in range(len(ret)):
-        dep = PackageSpecifier(ret[i])
-        if dep.name in deps:
-            ret[i] = str(dep + deps[dep.name])
+        if ret[i].name in deps:
+            ret[i] += deps[dep.name]
 
     return ret
 
