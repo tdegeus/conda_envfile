@@ -324,6 +324,22 @@ def _interpret(dependency: str) -> dict:
         dep, comment = dep.split("#", 1)
         warnings.warn(f"Comment '{comment}' ignored.", Warning)
 
+    # foo =1.0=abc
+
+    if re.match(r"^([^=^<^>^\s]*)(\s*)([=]+)([^=^<^>^\s]*)(\s*)([=]+)(.*)$", dep):
+
+        _, name, _, eq, version, _, eq2, build, _ = re.split(
+            r"^([^=^<^>^\s]*)(\s*)([=]+)([^=^<^>^\s]*)(\s*)([=]+)(.*)$", dep
+        )
+
+        if eq != "=":
+            raise ValueError(f"Invalid special dependency '{dep}'.")
+
+        if eq2 != "=":
+            raise ValueError(f"Invalid special dependency '{dep}'.")
+
+        return {"name": name, "build": build, "=": version}
+
     # foo =1.0.*
 
     if re.match(r"^([^=^\s]*)(\s*)([=]+)([^\*]*)(\*)$", dep):
@@ -426,18 +442,38 @@ class PackageSpecifier:
     def name(self) -> str:
         return self.data["name"]
 
+    @property
+    def build(self) -> str:
+        if "build" in self.data:
+            return self.data["build"]
+        else:
+            return ""
+
+    @property
+    def wildcard(self) -> str:
+        if "special" in self.data:
+            return self.data["special"]
+        else:
+            return ""
+
+    @property
+    def version_range(self) -> str:
+        return ", ".join(
+            [f"{e}{self.data[e]}" for e in ["=", ">=", ">", "<=", "<"] if e in self.data]
+        )
+
+    @property
+    def version(self) -> str:
+        if "special" in self.data:
+            return self.data["special"]
+        return self.version_range
+
     def __str__(self):
 
         if "special" in self.data:
             return f"{self.data['name']} {self.data['special']}"
         else:
-            return (
-                self.data["name"]
-                + " "
-                + ", ".join(
-                    [f"{e}{self.data[e]}" for e in ["=", ">=", ">", "<=", "<"] if e in self.data]
-                )
-            ).strip(" ")
+            return (self.data["name"] + " " + self.version).strip(" ")
 
     def __repr__(self) -> str:
         return str(self)
