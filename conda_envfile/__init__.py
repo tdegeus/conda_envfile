@@ -244,7 +244,7 @@ def _merge(*args) -> dict:
 
     assert a["name"] == b["name"]
 
-    if "special" in a and "special" in b:
+    if "wildcard" in a and "wildcard" in b:
         ba = _bounds(a)
         bb = _bounds(b)
         if ba[0] >= bb[0] and ba[1] <= bb[1]:
@@ -252,8 +252,8 @@ def _merge(*args) -> dict:
         elif bb[0] >= ba[0] and bb[1] <= ba[1]:
             return b
         else:
-            del a["special"]
-            del b["special"]
+            del a["wildcard"]
+            del b["wildcard"]
 
     if "=" in a and "=" in b:
         if _parse(a["="]) != _parse(b["="]):
@@ -263,8 +263,8 @@ def _merge(*args) -> dict:
 
     ret = {key: value for key, value in a.items()}
 
-    if "special" in b:
-        ret["special"] = b["special"]
+    if "wildcard" in b:
+        ret["wildcard"] = b["wildcard"]
 
     for key in b:
         if key not in ret:
@@ -295,7 +295,7 @@ def _merge(*args) -> dict:
     if ret == b:
         return b
 
-    ret.pop("special", None)
+    ret.pop("wildcard", None)
 
     return _check_legal(ret)
 
@@ -307,7 +307,7 @@ def _interpret(dependency: str) -> dict:
     :param dependency: Dependency specifier.
     :return: Dictionary::
         name  # name of the dependency
-        special  # wildcard version specifier (if used)
+        wildcard  # wildcard version specifier (if used)
         =  # precise version (if used)
         >=  # version range (if used)
         >  # version range (if used)
@@ -333,10 +333,10 @@ def _interpret(dependency: str) -> dict:
         )
 
         if eq != "=":
-            raise ValueError(f"Invalid special dependency '{dep}'.")
+            raise ValueError(f"Invalid wildcard dependency '{dep}'.")
 
         if eq2 != "=":
-            raise ValueError(f"Invalid special dependency '{dep}'.")
+            raise ValueError(f"Invalid wildcard dependency '{dep}'.")
 
         return {"name": name, "build": build, "=": version}
 
@@ -344,10 +344,12 @@ def _interpret(dependency: str) -> dict:
 
     if re.match(r"^([^=^\s]*)(\s*)([=]+)([^\*]*)(\*)$", dep):
 
-        _, name, _, eq, basename, special, _ = re.split(r"^([^=^\s]*)(\s*)([=]*)([^\*]*)(\*)$", dep)
+        _, name, _, eq, basename, wildcard, _ = re.split(
+            r"^([^=^\s]*)(\s*)([=]*)([^\*]*)(\*)$", dep
+        )
 
         if eq != "=":
-            raise ValueError(f"Invalid special dependency '{dep}'.")
+            raise ValueError(f"Invalid wildcard dependency '{dep}'.")
 
         if len(basename.split(".")) == 0:
             lower = basename
@@ -367,13 +369,13 @@ def _interpret(dependency: str) -> dict:
         else:
             lower = f"{lower}.0"
 
-        return {"name": name, "special": eq + basename + special, ">=": lower, "<": upper}
+        return {"name": name, "wildcard": eq + basename + wildcard, ">=": lower, "<": upper}
 
     # foo *
 
     if re.match(r"^([^\*^\s]*)(\s*)(\*)$", dep):
-        _, name, _, special, _ = re.split(r"^([^\*^\s]*)(\s*)(\*)$", dep)
-        return {"name": name, "special": special}
+        _, name, _, wildcard, _ = re.split(r"^([^\*^\s]*)(\s*)(\*)$", dep)
+        return {"name": name, "wildcard": wildcard}
 
     # foo
     # foo =1.0
@@ -451,8 +453,8 @@ class PackageSpecifier:
 
     @property
     def wildcard(self) -> str:
-        if "special" in self.data:
-            return self.data["special"]
+        if "wildcard" in self.data:
+            return self.data["wildcard"]
         else:
             return ""
 
@@ -464,14 +466,14 @@ class PackageSpecifier:
 
     @property
     def version(self) -> str:
-        if "special" in self.data:
-            return self.data["special"]
+        if "wildcard" in self.data:
+            return self.data["wildcard"]
         return self.version_range
 
     def __str__(self):
 
-        if "special" in self.data:
-            return f"{self.data['name']} {self.data['special']}"
+        if "wildcard" in self.data:
+            return self.data["name"] + " " + self.data["wildcard"]
         else:
             return (self.data["name"] + " " + self.version).strip(" ")
 
