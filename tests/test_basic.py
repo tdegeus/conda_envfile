@@ -8,6 +8,36 @@ import conda_envfile
 class Test(unittest.TestCase):
     """ """
 
+    def test_build(self):
+
+        v = conda_envfile.PackageSpecifier("foo=1.0=pypy")
+        self.assertEqual(v.name, "foo")
+        self.assertEqual(v.version, "=1.0")
+        self.assertEqual(v.version_range, "=1.0")
+        self.assertEqual(v.build, "pypy")
+        self.assertEqual(v.wildcard, "")
+
+        v = conda_envfile.PackageSpecifier("foo=1.0")
+        self.assertEqual(v.name, "foo")
+        self.assertEqual(v.version, "=1.0")
+        self.assertEqual(v.version_range, "=1.0")
+        self.assertEqual(v.build, "")
+        self.assertEqual(v.wildcard, "")
+
+        v = conda_envfile.PackageSpecifier("foo=1.*")
+        self.assertEqual(v.name, "foo")
+        self.assertEqual(v.version, "=1.*")
+        self.assertEqual(v.version_range, ">=1.0, <2.0")
+        self.assertEqual(v.build, "")
+        self.assertEqual(v.wildcard, "=1.*")
+
+        v = conda_envfile.PackageSpecifier("foo *")
+        self.assertEqual(v.name, "foo")
+        self.assertEqual(v.version, "*")
+        self.assertEqual(v.version_range, "")
+        self.assertEqual(v.build, "")
+        self.assertEqual(v.wildcard, "*")
+
     def test_PackageSpecifier_has_same_name(self):
 
         self.assertTrue(conda_envfile.PackageSpecifier("foo =1.0").has_same_name("foo"))
