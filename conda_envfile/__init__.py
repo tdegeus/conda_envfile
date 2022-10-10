@@ -323,15 +323,9 @@ def _interpret(dependency: str) -> dict:
         dep, comment = dep.split("#", 1)
         warnings.warn(f"Comment '{comment}' ignored.", Warning)
 
-    # foo *
-
-    if re.match(r"^([^\*^\s]*)(\s*)(\*)$", dep):
-        _, name, _, special, _ = re.split(r"^([^\*^\s]*)(\s*)(\*)$", dep)
-        return {"name": name, "special": special}
-
     # foo =1.0.*
 
-    if re.match(r"^([^=^\s]*)(\s*)([=]*)([^\*]*)(\*)$", dep):
+    if re.match(r"^([^=^\s]*)(\s*)([=]+)([^\*]*)(\*)$", dep):
 
         _, name, _, eq, basename, special, _ = re.split(r"^([^=^\s]*)(\s*)([=]*)([^\*]*)(\*)$", dep)
 
@@ -357,6 +351,12 @@ def _interpret(dependency: str) -> dict:
             lower = f"{lower}.0"
 
         return {"name": name, "special": eq + basename + special, ">=": lower, "<": upper}
+
+    # foo *
+
+    if re.match(r"^([^\*^\s]*)(\s*)(\*)$", dep):
+        _, name, _, special, _ = re.split(r"^([^\*^\s]*)(\s*)(\*)$", dep)
+        return {"name": name, "special": special}
 
     # foo
     # foo =1.0
