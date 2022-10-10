@@ -21,6 +21,7 @@ class Test(unittest.TestCase):
 
         for name in interpret:
             self.assertEqual(str(conda_envfile.Specifier(name)), name)
+            self.assertEqual(str(conda_envfile.Specifier(name.replace(" ", ""))), name)
 
         self.assertEqual(
             str(conda_envfile.Specifier("foo >=1.2.0, <=1.2.0")),
@@ -99,10 +100,11 @@ class Test(unittest.TestCase):
             ],
         ]
 
-        for deps, expected in dependencies:
+        for deps, expect in dependencies:
             for _ in range(len(deps)):
                 deps.append(deps.pop(0))
-                self.assertEqual(conda_envfile.unique(*deps), expected)
+                self.assertEqual(conda_envfile.unique(*deps), expect)
+                self.assertEqual(conda_envfile.unique(*[i.replace(" ", "") for i in deps]), expect)
 
         illegal = [
             ["foo >1.2.0", "foo <1.2.0", "foo", "foo *", "foo =1.2.*"],
@@ -117,6 +119,8 @@ class Test(unittest.TestCase):
                 deps.append(deps.pop(0))
                 with self.assertRaises(ValueError):
                     conda_envfile.unique(*deps)
+                with self.assertRaises(ValueError):
+                    conda_envfile.unique(*[i.replace(" ", "") for i in deps])
 
     def test_remove(self):
 
