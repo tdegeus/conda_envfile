@@ -4,7 +4,6 @@ import re
 import sys
 import warnings
 from collections import defaultdict
-from functools import singledispatch
 
 import click
 import packaging.specifiers
@@ -455,13 +454,86 @@ class PackageSpecifier:
         self.data = _merge(self.data, other.data)
         return self
 
-    @singledispatch
-    def has_same_name(self, other):
-        return self.data["name"] == other.data["name"]
+    def __contains__(self, other):
 
-    @has_same_name.register(str)
-    def _(self, other):
-        return self.has_same_name(PackageSpecifier(other))
+        if type(other) == str:
+            other = PackageSpecifier(other).data
+        elif type(other) == packaging.version.Version:
+            other = {"name": self.data["name"], "=": str(other)}
+        else:
+            other = {**other.data}
+
+        if other["name"] != self.data["name"]:
+            return False
+
+        if all([key not in other for key in ["=", ">=", ">", "<=", "<"]]):
+            for key in ["=", ">=", ">", "<=", "<"]:
+                if key in self.data:
+                    return False
+
+        if "=" in self.data:
+            if "=" not in other:
+                return False
+            return _parse(self.data["="]) == _parse(other["="])
+
+        if "=" in other:
+            if "<" in self.data:
+                if _parse(other["="]) >= _parse(self.data["<"]):
+                    return False
+            if "<=" in self.data:
+                if _parse(other["="]) > _parse(self.data["<="]):
+                    return False
+            if ">" in self.data:
+                if _parse(other["="]) <= _parse(self.data[">"]):
+                    return False
+            if ">=" in self.data:
+                if _parse(other["="]) < _parse(self.data[">="]):
+                    return False
+
+        if "<" in other and "<=" in self.data:
+            if _parse(other["<"]) > _parse(self.data["<="]):
+                return False
+
+        if "<=" in other and "<" in self.data:
+            if _parse(other["<="]) >= _parse(self.data["<"]):
+                return False
+
+        if ">=" in other and ">" in self.data:
+            if _parse(other[">="]) <= _parse(self.data[">"]):
+                return False
+
+        if ">" in other and ">=" in self.data:
+            if _parse(other[">"]) < _parse(self.data[">="]):
+                return False
+
+        if (">" in self.data or ">=" in self.data) and ("<" in self.data or "<=" in self.data):
+            if not (
+                (">" in other or ">=" in other) and ("<" in other or "<=" in other) or "=" in other
+            ):
+                return False
+
+        other.setdefault("<", "0")
+        other.setdefault("<=", "0")
+        other.setdefault(">", "9999999999999999")
+        other.setdefault(">=", "9999999999999999")
+
+        for cmp in [">", ">="]:
+            if cmp in self.data:
+                if _parse(other[cmp]) < _parse(self.data[cmp]):
+                    return False
+
+        for cmp in ["<", "<="]:
+            if cmp in self.data:
+                if _parse(other[cmp]) > _parse(self.data[cmp]):
+                    return False
+
+        return True
+
+    def has_same_name(self, other):
+        if type(other) == str:
+            other = PackageSpecifier(other)
+
+        return self.data["name"] == other.data["name"]
 
 
 def remove(dependencies: list[str], *args: list[str]) -> list[str]:
