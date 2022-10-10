@@ -506,17 +506,17 @@ def restrict(source, other: list[str] = None) -> list[PackageSpecifier]:
     :return: List of dependencies.
     """
 
-    deps = defaultdict(PackageSpecifier)
+    restriction = defaultdict(PackageSpecifier)
 
     for dep in unique(*other):
         dep = PackageSpecifier(dep)
-        deps[dep.name] += dep
+        restriction[dep.name] += dep
 
     ret = [PackageSpecifier(i) for i in source]
 
-    for i in range(len(ret)):
-        if ret[i].name in deps:
-            ret[i] += deps[dep.name]
+    for i, dep in enumerate(ret):
+        if dep.name in restriction:
+            ret[i] += restriction[dep.name]
 
     return ret
 
