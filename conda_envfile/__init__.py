@@ -1,4 +1,5 @@
 import argparse
+import copy
 import os
 import re
 import sys
@@ -11,159 +12,401 @@ import packaging.version
 import yaml
 from jinja2 import BaseLoader
 from jinja2 import Environment
+from packaging.version import _cmpkey
+from packaging.version import Version
 
 from ._version import version
 
+_MinInf = Version("0")
+_MinInf._key = _cmpkey(
+    epoch=-sys.maxsize, release=(-sys.maxsize,), pre=None, post=None, dev=None, local=None
+)
 
-def _parse(version):
-    return packaging.version.parse(version)
+_PlusInf = Version("999999999999")
+_PlusInf._key = _cmpkey(
+    epoch=+sys.maxsize, release=(+sys.maxsize,), pre=None, post=None, dev=None, local=None
+)
 
 
-def _check_legal(dep: dict):
+class VersionRange:
     """
-    Check that the dependency is legal, make small simplifications.
-    """
-
-    if "=" in dep:
-
-        if "<" in dep:
-            if _parse(dep["<"]) < _parse(dep["="]):
-                raise ValueError(f"Invalid dependency: {dep}")
-            del dep["<"]
-
-        if "<=" in dep:
-            if _parse(dep["<="]) < _parse(dep["="]):
-                raise ValueError(f"Invalid dependency: {dep}")
-            del dep["<="]
-
-        if ">" in dep:
-            if _parse(dep[">"]) > _parse(dep["="]):
-                raise ValueError(f"Invalid dependency: {dep}")
-            del dep[">"]
-
-        if ">=" in dep:
-            if _parse(dep[">="]) > _parse(dep["="]):
-                raise ValueError(f"Invalid dependency: {dep}")
-            del dep[">="]
-
-        return dep
-
-    if "<" in dep and ">" in dep:
-        if _parse(dep[">"]) >= _parse(dep["<"]):
-            raise ValueError(f"Invalid version range: {dep}")
-
-    if "<" in dep and ">=" in dep:
-        if _parse(dep[">="]) >= _parse(dep["<"]):
-            raise ValueError(f"Invalid version range: {dep}")
-
-    if "<=" in dep and ">" in dep:
-        if _parse(dep[">"]) >= _parse(dep["<="]):
-            raise ValueError(f"Invalid version range: {dep}")
-
-    if "<=" in dep and ">=" in dep:
-        if _parse(dep[">="]) > _parse(dep["<="]):
-            raise ValueError(f"Invalid version range: {dep}")
-        elif _parse(dep[">="]) == _parse(dep["<="]):
-            dep["="] = dep[">="]
-            for key in ["<=", ">=", "<", ">"]:
-                if key in dep:
-                    del dep[key]
-
-    return dep
-
-
-def _bounds(dep: dict) -> list[str]:
-    """
-    Return the bounds of the dependency.
+    Specify the most restrictive version range.
+    If you overwrite properties are add version ranges only the most restrictive range will be kept
+    (a ``ValueError`` will be raised if the new range is not compatible with the existing one).
     """
 
-    if "=" in dep:
-        return [_parse(dep["="]), _parse(dep["="])]
+    def __init__(
+        self,
+        equal: str = None,
+        less: str = None,
+        less_equal: str = None,
+        greater: str = None,
+        greater_equal: str = None,
+    ):
 
-    ret = [_parse("0"), _parse("9999999999999999")]
+        self._eq = _PlusInf
+        self._lt = _PlusInf
+        self._le = _PlusInf
+        self._gt = _MinInf
+        self._ge = _MinInf
 
-    if ">=" in dep and ">" in dep:
-        if _parse(dep[">="]) > _parse(dep[">"]):
-            ret[0] = _parse(dep[">="])
+        self.eq = None
+        self.lt = None
+        self.le = None
+        self.gt = None
+        self.ge = None
+
+        self.less = less
+        self.less_equal = less_equal
+        self.greater = greater
+        self.greater_equal = greater_equal
+
+        if equal:
+            self.equal = equal
+
+    @property
+    def equal(self):
+        return self.eq
+
+    @property
+    def less(self):
+        return self.lt
+
+    @property
+    def less_equal(self):
+        return self.lt
+
+    @property
+    def greater(self):
+        return self.gt
+
+    @property
+    def greater_equal(self):
+        return self.gt
+
+    @equal.setter
+    def equal(self, value: str):
+
+        if not value:
+            self.eq = None
+            self._eq = _PlusInf
+            return
+
+        self.set_equal(value, packaging.version.parse(value))
+
+    @less.setter
+    def less(self, value: str):
+
+        if not value:
+            self.lt = None
+            self._lt = _PlusInf
+            return
+
+        self.set_less(value, packaging.version.parse(value))
+
+    @less_equal.setter
+    def less_equal(self, value: str):
+
+        if not value:
+            self.le = None
+            self._le = _PlusInf
+            return
+
+        self.set_less_equal(value, packaging.version.parse(value))
+
+    @greater.setter
+    def greater(self, value: str):
+
+        if not value:
+            self.gt = None
+            self._gt = _MinInf
+            return
+
+        self.set_greater(value, packaging.version.parse(value))
+
+    @greater_equal.setter
+    def greater_equal(self, value: str):
+
+        if not value:
+            self.ge = None
+            self._ge = _MinInf
+            return
+
+        self.set_greater_equal(value, packaging.version.parse(value))
+
+    def set_equal(self, value: str, parsed: Version):
+
+        if self.eq:
+            if parsed != self._eq:
+                raise ValueError("Can't set equal to two different values")
+
+        self.eq = value
+        self._eq = parsed
+
+        if self._eq >= self._lt:
+            raise ValueError(f"Version clash: ={value}")
+
+        if self._eq > self._le:
+            raise ValueError(f"Version clash: ={value}")
+
+        if self._eq <= self._gt:
+            raise ValueError(f"Version clash: ={value}")
+
+        if self._eq < self._ge:
+            raise ValueError(f"Version clash: ={value}")
+
+        self.less = None
+        self.less_equal = None
+        self.greater = None
+        self.greater_equal = None
+
+    def set_less(self, value: str, parsed: Version):
+
+        if self.eq:
+            if parsed > self._eq:
+                return
+            else:
+                raise ValueError(f"Version clash: <{value}")
+
+        if parsed >= self._lt:
+            return
+
+        if parsed <= self._le:
+            self.lt = value
+            self._lt = parsed
+            self.less_equal = None
+
+        if parsed <= self._gt:
+            raise ValueError(f"Version clash: <{value}")
+
+        if parsed <= self._ge:
+            raise ValueError(f"Version clash: <={value}")
+
+    def set_less_equal(self, value: str, parsed: Version):
+
+        if self.eq:
+            if parsed >= self._eq:
+                return
+            else:
+                raise ValueError(f"Version clash: <={value}")
+
+        if parsed > self._le:
+            return
+
+        if parsed < self._lt:
+            self.le = value
+            self._le = parsed
+            self.less = None
+
+        if parsed <= self._gt:
+            raise ValueError(f"Version clash: <{value}")
+
+        if parsed < self._ge:
+            raise ValueError(f"Version clash: <={value}")
+
+        if self._le == self._ge:
+            self.set_equal(value, parsed)
+
+    def set_greater(self, value: str, parsed: Version):
+
+        if self.eq:
+            if parsed < self._eq:
+                return
+            else:
+                raise ValueError(f"Version clash: <{value}")
+
+        if parsed <= self._gt:
+            return
+
+        if parsed >= self._ge:
+            self.gt = value
+            self._gt = parsed
+            self.greater_equal = None
+
+        if parsed >= self._lt:
+            raise ValueError(f"Version clash: >{value}")
+
+        if parsed >= self._le:
+            raise ValueError(f"Version clash: >={value}")
+
+    def set_greater_equal(self, value: str, parsed: Version):
+
+        if self.eq:
+            if parsed <= self._eq:
+                return
+            else:
+                raise ValueError(f"Version clash: <={value}")
+
+        if parsed <= self._ge:
+            return
+
+        if parsed > self._gt:
+            self.ge = value
+            self._ge = parsed
+            self.greater = None
+
+        if parsed >= self._lt:
+            raise ValueError(f"Version clash: >{value}")
+
+        if parsed > self._le:
+            raise ValueError(f"Version clash: >={value}")
+
+        if self._le == self._ge:
+            self.set_equal(value, parsed)
+
+    def set(self, cmp: str, value: str = None):
+
+        if cmp == "=":
+            self.equal = value
+        elif cmp == "<":
+            self.less = value
+        elif cmp == "<=":
+            self.less_equal = value
+        elif cmp == ">":
+            self.greater = value
+        elif cmp == ">=":
+            self.greater_equal = value
+        elif cmp == "==":
+            self.equal = value
         else:
-            ret[0] = _parse(dep[">"])
-    elif ">=" in dep:
-        ret[0] = _parse(dep[">="])
-    elif ">" in dep:
-        ret[0] = _parse(dep[">"])
+            raise ValueError(f"Unknown comparator: {cmp}")
 
-    if "<=" in dep and "<" in dep:
-        if _parse(dep["<="]) < _parse(dep["<"]):
-            ret[1] = _parse(dep["<="])
-        else:
-            ret[1] = _parse(dep["<"])
-    elif "<=" in dep:
-        ret[1] = _parse(dep["<="])
-    elif "<" in dep:
-        ret[1] = _parse(dep["<"])
+    def __eq__(self, other) -> bool:
+        return all(
+            [
+                self.eq == other.eq,
+                self.lt == other.lt,
+                self.le == other.le,
+                self.gt == other.gt,
+                self.ge == other.ge,
+            ]
+        )
 
-    return ret
+    def isempty(self) -> bool:
+        return not any([self.eq, self.lt, self.le, self.gt, self.ge])
+
+    def __str__(self) -> str:
+        ret = []
+        if self.eq:
+            ret.append("=" + self.eq)
+        if self.gt:
+            ret.append(">" + self.gt)
+        if self.ge:
+            ret.append(">=" + self.ge)
+        if self.lt:
+            ret.append("<" + self.lt)
+        if self.le:
+            ret.append("<=" + self.le)
+        return ", ".join(ret)
+
+    def __repr__(self) -> str:
+        return str(self)
+
+    def __iadd__(self, other):
+        return _mymerge(self, other)
+
+    def __add__(self, other):
+        return _mymerge(self, other)
+
+    def __concat__(self, other):
+        return _mymerge(self, other)
+
+    def __contains__(self, other):
+
+        if self == other:
+            return True
+
+        if self.eq:
+            if other.eq:
+                return self.eq == other.eq
+            return False
+
+        if other.eq:
+            if other._eq >= self._lt:
+                return False
+            if other._eq > self._le:
+                return False
+            if other._eq <= self._gt:
+                return False
+            if other._eq < self._ge:
+                return False
+            return True
+
+        if other._lt > self._le and other.lt:
+            return False
+        if other._le >= self._lt and other.le:
+            return False
+        if other._ge <= self._gt and other.ge:
+            return False
+        if other._gt < self._ge and other.gt:
+            return False
+
+        if (self.ge or self.gt) and (self.lt or self.le):
+            if not (other.ge or other.gt) and (other.lt or other.le):
+                return False
+
+        lt = other._lt
+        le = other._le
+        gt = other._gt
+        ge = other._ge
+
+        if not other.lt:
+            lt = _MinInf
+        if not other.le:
+            le = _MinInf
+        if not other.gt:
+            gt = _PlusInf
+        if not other.ge:
+            ge = _PlusInf
+
+        if gt < self._gt:
+            return False
+        if ge < self._ge:
+            return False
+        if lt > self._lt:
+            return False
+        if le > self._le:
+            return False
+
+        if any([self.lt, self.le, self.gt, self.ge]):
+            if not any([other.lt, other.le, other.gt, other.ge]):
+                return False
+
+        return True
 
 
-def _merge(*args) -> dict:
-    """
-    Merge two dependencies, keep the most restrictive dependencies.
-    """
-    assert len(args) == 2
-    a = {**args[0]}
-    b = {**args[1]}
+def _mymerge(a: VersionRange, b: VersionRange) -> VersionRange:
 
-    if a == {}:
+    if a.isempty():
         return b
-    if b == {}:
+
+    if b.isempty():
+        return a
+
+    if a._lt < b._lt and a._le < b._le and a._gt > b._gt and a._ge > b._ge:
+        return a
+
+    elif b._lt < a._lt and b._le < a._le and b._gt > a._gt and b._ge > a._ge:
         return b
 
-    assert a["name"] == b["name"]
-
-    if "wildcard" in a and "wildcard" in b:
-        ba = _bounds(a)
-        bb = _bounds(b)
-        if ba[0] >= bb[0] and ba[1] <= bb[1]:
+    if a.eq and b.eq:
+        if a._eq == b._eq:
             return a
-        elif bb[0] >= ba[0] and bb[1] <= ba[1]:
-            return b
         else:
-            del a["wildcard"]
-            del b["wildcard"]
+            raise ValueError(f"Version clash: ={a.eq} and ={b.eq}")
 
-    if "=" in a and "=" in b:
-        if _parse(a["="]) != _parse(b["="]):
-            raise ValueError(f"Multiple version dependencies: {a['name']}")
-        else:
-            return a
+    ret = copy.deepcopy(a)
 
-    ret = {key: value for key, value in a.items()}
-
-    if "wildcard" in b:
-        ret["wildcard"] = b["wildcard"]
-
-    for key in b:
-        if key not in ret:
-            ret[key] = b[key]
-        else:
-            if key in ["<", "<="]:
-                if _parse(b[key]) < _parse(ret[key]):
-                    ret[key] = b[key]
-            elif key in [">", ">="]:
-                if _parse(b[key]) > _parse(ret[key]):
-                    ret[key] = b[key]
-
-    if "<" in ret and "<=" in ret:
-        if _parse(ret["<="]) < _parse(ret["<"]):
-            del ret["<"]
-        else:
-            del ret["<="]
-
-    if ">=" in ret and ">" in ret:
-        if _parse(ret[">="]) > _parse(ret[">"]):
-            del ret[">"]
-        else:
-            del ret[">="]
+    if b.lt:
+        ret.set_less(b.lt, b._lt)
+    if b.le:
+        ret.set_less_equal(b.le, b._le)
+    if b.gt:
+        ret.set_greater(b.gt, b._gt)
+    if b.ge:
+        ret.set_greater_equal(b.ge, b._ge)
+    if b.eq:
+        ret.set_equal(b.eq, b._eq)
 
     if ret == a:
         return a
@@ -171,9 +414,7 @@ def _merge(*args) -> dict:
     if ret == b:
         return b
 
-    ret.pop("wildcard", None)
-
-    return _check_legal(ret)
+    return ret
 
 
 def _interpret(dependency: str) -> dict:
@@ -214,7 +455,7 @@ def _interpret(dependency: str) -> dict:
         if eq2 != "=":
             raise ValueError(f"Invalid wildcard dependency '{dep}'.")
 
-        return {"name": name, "build": build, "=": version}
+        return {"name": name, "build": build, "range": VersionRange(equal=version)}
 
     # foo =1.0.*
 
@@ -245,13 +486,17 @@ def _interpret(dependency: str) -> dict:
         else:
             lower = f"{lower}.0"
 
-        return {"name": name, "wildcard": eq + basename + wildcard, ">=": lower, "<": upper}
+        return {
+            "name": name,
+            "wildcard": eq + basename + wildcard,
+            "range": VersionRange(greater_equal=lower, less=upper),
+        }
 
     # foo *
 
     if re.match(r"^([^\*^\s]*)(\s*)(\*)$", dep):
         _, name, _, wildcard, _ = re.split(r"^([^\*^\s]*)(\s*)(\*)$", dep)
-        return {"name": name, "wildcard": wildcard}
+        return {"name": name, "wildcard": wildcard, "range": VersionRange()}
 
     # foo
     # foo =1.0
@@ -271,21 +516,21 @@ def _interpret(dependency: str) -> dict:
     if len(sp) > 1:
         _, ver, _, _, eq2, ver2, _ = sp
 
-    ret = {"name": name}
+    ret = {"name": name, "range": VersionRange()}
 
     if eq == "=" and eq2:
         raise ValueError(f"Cannot have two equalities in '{dep}'")
     if eq in [">=", ">"] and eq2 in [">=", ">"]:
         raise ValueError(f"Illegal bound in '{dep}'")
 
-    for a, b in [(eq, ver), (eq2, ver2)]:
-        if not a:
-            if b:
+    for e, v in [(eq, ver), (eq2, ver2)]:
+        if not e:
+            if v:
                 raise ValueError(f"Missing equality in '{dep}'")
             continue
-        ret[a] = b
+        ret["range"].set(e, v)
 
-    return _check_legal(ret)
+    return ret
 
 
 class PackageSpecifier:
@@ -313,147 +558,122 @@ class PackageSpecifier:
         "foo *"
     """
 
-    def __init__(self, text: str = None):
-        if type(text) == PackageSpecifier:
-            self.data = {**text.data}
+    def __init__(self, interpret: str = None):
+
+        self.name = None
+        self.wildcard = None
+        self.build = None
+        self.range = VersionRange()
+
+        if interpret is None:
+            return
+        elif type(interpret) == PackageSpecifier:
+            self.name = interpret.name
+            self.wildcard = interpret.wildcard
+            self.build = interpret.build
+            self.range = copy.deepcopy(interpret.range)
         else:
-            self.data = _interpret(text)
-
-    @property
-    def name(self) -> str:
-        return self.data["name"]
-
-    @property
-    def build(self) -> str:
-        if "build" in self.data:
-            return self.data["build"]
-        else:
-            return ""
-
-    @property
-    def wildcard(self) -> str:
-        if "wildcard" in self.data:
-            return self.data["wildcard"]
-        else:
-            return ""
-
-    @property
-    def version_range(self) -> str:
-        return ", ".join(
-            [f"{e}{self.data[e]}" for e in ["=", ">=", ">", "<=", "<"] if e in self.data]
-        )
+            data = _interpret(interpret)
+            self.name = data.pop("name", None)
+            self.wildcard = data.pop("wildcard", None)
+            self.build = data.pop("build", None)
+            self.range = data.pop("range", None)
 
     @property
     def version(self) -> str:
-        if "wildcard" in self.data:
-            return self.data["wildcard"]
-        return self.version_range
+        """
+        The version specification, e.g. ``=1.0``, ``=1.0.*``, ``>=1.0``, ``>=1.0, <2.0``.
+        """
+        if self.wildcard:
+            return self.wildcard
+        return str(self.range)
+
+    @version.setter
+    def version(self, value: str):
+        self.data = _interpret(self.name + " " + value)
 
     def __eq__(self, other) -> bool:
-        return self.data == other.data
+
+        if type(other) == str:
+            other = PackageSpecifier(other)
+
+        return all(
+            [
+                self.name == other.name,
+                self.wildcard == other.wildcard,
+                self.build == other.build,
+                self.range == other.range,
+            ]
+        )
 
     def __str__(self):
+        if self.wildcard:
+            return f"{self.name} {self.wildcard}"
 
-        if "wildcard" in self.data:
-            return self.data["name"] + " " + self.data["wildcard"]
-        else:
-            return (self.data["name"] + " " + self.version).strip(" ")
+        ret = f"{self.name} {self.range}"
+
+        if self.build:
+            ret += f"={self.build}"
+
+        return ret.rstrip()
 
     def __repr__(self) -> str:
         return str(self)
 
-    def __iadd__(self, other):
-        self.data = _merge(self.data, other.data)
+    def merge(self, other):
+        if self.name is None:
+            return other
+
+        if self.name != other.name:
+            raise ValueError(f"Cannot combine '{self.name}' with '{other.name}'")
+
+        r = self.range + other.range
+
+        if r == self.range and r == other.range:
+            if other.wildcard:
+                if self.wildcard:
+                    if self.wildcard != other.wildcard:
+                        raise ValueError(f"Cannot combine '{self}' with '{other}'")
+                self.wildcard = other.wildcard
+            if other.build:
+                if self.build:
+                    if self.build != other.build:
+                        raise ValueError(f"Cannot combine '{self}' with '{other}'")
+                self.build = other.build
+            return self
+
+        if r == self.range:
+            return self
+
+        if r == other.range:
+            return other
+
+        self.build = None
+        self.wildcard = None
+        self.range = r
         return self
+
+    def __iadd__(self, other):
+        return self.merge(other)
 
     def __add__(self, other):
-        self.data = _merge(self.data, other.data)
-        return self
+        return self.merge(other)
 
     def __concat__(self, other):
-        self.data = _merge(self.data, other.data)
-        return self
+        return self.merge(other)
 
     def __contains__(self, other):
 
         if type(other) == str:
-            other = PackageSpecifier(other).data
-        elif type(other) == packaging.version.Version:
-            other = {"name": self.data["name"], "=": str(other)}
-        else:
-            other = {**other.data}
-
-        if other["name"] != self.data["name"]:
-            return False
-
-        if all([key not in other for key in ["=", ">=", ">", "<=", "<"]]):
-            for key in ["=", ">=", ">", "<=", "<"]:
-                if key in self.data:
-                    return False
-
-        if "=" in self.data:
-            if "=" not in other:
-                return False
-            return _parse(self.data["="]) == _parse(other["="])
-
-        if "=" in other:
-            if "<" in self.data:
-                if _parse(other["="]) >= _parse(self.data["<"]):
-                    return False
-            if "<=" in self.data:
-                if _parse(other["="]) > _parse(self.data["<="]):
-                    return False
-            if ">" in self.data:
-                if _parse(other["="]) <= _parse(self.data[">"]):
-                    return False
-            if ">=" in self.data:
-                if _parse(other["="]) < _parse(self.data[">="]):
-                    return False
-
-        if "<" in other and "<=" in self.data:
-            if _parse(other["<"]) > _parse(self.data["<="]):
-                return False
-
-        if "<=" in other and "<" in self.data:
-            if _parse(other["<="]) >= _parse(self.data["<"]):
-                return False
-
-        if ">=" in other and ">" in self.data:
-            if _parse(other[">="]) <= _parse(self.data[">"]):
-                return False
-
-        if ">" in other and ">=" in self.data:
-            if _parse(other[">"]) < _parse(self.data[">="]):
-                return False
-
-        if (">" in self.data or ">=" in self.data) and ("<" in self.data or "<=" in self.data):
-            if not (
-                (">" in other or ">=" in other) and ("<" in other or "<=" in other) or "=" in other
-            ):
-                return False
-
-        other.setdefault("<", "0")
-        other.setdefault("<=", "0")
-        other.setdefault(">", "9999999999999999")
-        other.setdefault(">=", "9999999999999999")
-
-        for cmp in [">", ">="]:
-            if cmp in self.data:
-                if _parse(other[cmp]) < _parse(self.data[cmp]):
-                    return False
-
-        for cmp in ["<", "<="]:
-            if cmp in self.data:
-                if _parse(other[cmp]) > _parse(self.data[cmp]):
-                    return False
-
-        return True
-
-    def has_same_name(self, other):
-        if type(other) == str:
             other = PackageSpecifier(other)
 
-        return self.data["name"] == other.data["name"]
+        if self == other:
+            return True
+
+        if other.name != self.name:
+            return False
+
+        return other.range in self.range
 
 
 def remove(dependencies: list[str], *args: list[str]) -> list[str]:
@@ -509,7 +729,6 @@ def restrict(source, other: list[str] = None) -> list[PackageSpecifier]:
     restriction = defaultdict(PackageSpecifier)
 
     for dep in unique(*other):
-        dep = PackageSpecifier(dep)
         restriction[dep.name] += dep
 
     ret = [PackageSpecifier(i) for i in source]
