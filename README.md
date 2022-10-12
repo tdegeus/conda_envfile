@@ -26,7 +26,7 @@ In your `.pre-commit-config.yaml`, add:
 
 ```yaml
 - repo: https://github.com/tdegeus/conda_envfile
-  rev: v0.1.0
+  rev: v0.2.1
   hooks:
   - id: conda_envfile_parse
     files: "environment.yaml"
@@ -41,7 +41,7 @@ Combine different version restrictions. For example:
 ```python
 import conda_envfile
 
-conda_envfile.unique("foo >1.2.0", "foo =1.2.*")
+list(map(str, conda_envfile.unique("foo >1.2.0", "foo =1.2.*")))
 ```
 
 which returns

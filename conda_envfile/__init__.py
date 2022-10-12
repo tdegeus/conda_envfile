@@ -31,8 +31,28 @@ _PlusInf._key = _cmpkey(
 class VersionRange:
     """
     Specify the most restrictive version range.
-    If you overwrite properties are add version ranges only the most restrictive range will be kept
-    (a ``ValueError`` will be raised if the new range is not compatible with the existing one).
+
+    *   Modification of properties only leads to a change if the new value is more restrictive.
+        For example::
+
+            >>> vr = VersionRange(less="2.0")
+            >>> vr.less_equal = "1.0"
+            >>> print(vr)
+            "<=1.0"
+
+        while::
+
+            >>> vr = VersionRange(less="2.0")
+            >>> vr.less_equal = "3.0"
+            >>> print(vr)
+            "<2.0"
+
+    *   Merging two ranges to the most restrictive is done using ``+``::
+
+            >>> a = VersionRange(less="2.0")
+            >>> b = VersionRange(greater="1.0")
+            >>> print(a + b)
+            ">1.0, <2.0"
     """
 
     def __init__(
@@ -422,14 +442,7 @@ def _interpret(dependency: str) -> dict:
     Interpret a version string.
 
     :param dependency: Dependency specifier.
-    :return: Dictionary::
-        name  # name of the dependency
-        wildcard  # wildcard version specifier (if used)
-        =  # precise version (if used)
-        >=  # version range (if used)
-        >  # version range (if used)
-        <=  # version range (if used)
-        <  # version range (if used)
+    :return: Dictionary with keys 'name', 'range', and optionally 'wildcard', 'build'.
     """
 
     if dependency is None:
