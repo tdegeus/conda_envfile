@@ -925,7 +925,7 @@ def conda_envfile_parse(args: list[str]):
 
     for filename in args.files:
         env = parse_file(filename)
-        env["dependencies"] = unique(*env["dependencies"])
+        env["dependencies"] = list(map(str, unique(*env["dependencies"])))
         with open(filename, "w") as file:
             yaml.dump(env, file)
 
@@ -943,8 +943,8 @@ def _conda_envfile_merge_parser():
     parser = argparse.ArgumentParser(description=desc)
     parser.add_argument("-f", "--force", action="store_true", help="Force overwrite output file.")
     parser.add_argument("-o", "--output", type=str, help="Write to output file.")
-    parser.add_argument("-a", "--append", type=str, action="append", help="Append dependencies.")
-    parser.add_argument("-r", "--remove", type=str, action="append", help="Remove dependencies.")
+    parser.add_argument("-a", "--append", type=str, action="append", default=[], help="Append deps")
+    parser.add_argument("-r", "--remove", type=str, action="append", default=[], help="Remove deps")
     parser.add_argument("--version", action="version", version=version)
     parser.add_argument("files", type=str, nargs="*", help="Input files.")
     return parser
@@ -963,6 +963,8 @@ def conda_envfile_merge(args: list[str]):
 
     if args.remove:
         env["dependencies"] = remove(env["dependencies"], *args.remove)
+
+    env["dependencies"] = list(map(str, env["dependencies"]))
 
     if not args.output:
         print(yaml.dump(env, default_flow_style=False, default_style="").strip())
@@ -1055,6 +1057,7 @@ def conda_envfile_restrict(args: list[str]):
         other += parse_file(filename)["dependencies"]
 
     env["dependencies"] = restrict(source, unique(*(other + args.append)))
+    env["dependencies"] = list(map(str, *env["dependencies"]))
 
     if not args.output:
         print(yaml.dump(env, default_flow_style=False, default_style="").strip())
