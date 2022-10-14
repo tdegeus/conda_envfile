@@ -154,11 +154,14 @@ class VersionRange:
 
         self.set_greater_equal(value, packaging.version.parse(value))
 
-    def set_equal(self, value: str, parsed: Version):
+    def set_equal(self, value: str, parsed: Version, force: bool = True):
 
         if self.eq:
             if parsed != self._eq:
                 raise ValueError("Can't set equal to two different values")
+            if not force:
+                if len(self.eq) > len(value):
+                    return
 
         self.eq = value
         self._eq = parsed
@@ -180,13 +183,21 @@ class VersionRange:
         self.greater = None
         self.greater_equal = None
 
-    def set_less(self, value: str, parsed: Version):
+    def set_less(self, value: str, parsed: Version, force: bool = True):
 
         if self.eq:
             if parsed > self._eq:
                 return
             else:
                 raise ValueError(f"Version clash: <{value}")
+
+        if self.lt and self._lt == parsed and not force:
+            if len(self.lt) > len(value):
+                return
+            else:
+                self.lt = value
+                self._lt = parsed
+                return
 
         if parsed >= self._lt:
             return
@@ -202,13 +213,21 @@ class VersionRange:
         if parsed <= self._ge:
             raise ValueError(f"Version clash: <={value}")
 
-    def set_less_equal(self, value: str, parsed: Version):
+    def set_less_equal(self, value: str, parsed: Version, force: bool = True):
 
         if self.eq:
             if parsed >= self._eq:
                 return
             else:
                 raise ValueError(f"Version clash: <={value}")
+
+        if self.le and self._le == parsed and not force:
+            if len(self.le) > len(value):
+                return
+            else:
+                self.le = value
+                self._le = parsed
+                return
 
         if parsed > self._le:
             return
@@ -227,13 +246,21 @@ class VersionRange:
         if self._le == self._ge:
             self.set_equal(value, parsed)
 
-    def set_greater(self, value: str, parsed: Version):
+    def set_greater(self, value: str, parsed: Version, force: bool = True):
 
         if self.eq:
             if parsed < self._eq:
                 return
             else:
                 raise ValueError(f"Version clash: <{value}")
+
+        if self.gt and self._gt == parsed and not force:
+            if len(self.gt) > len(value):
+                return
+            else:
+                self.gt = value
+                self._gt = parsed
+                return
 
         if parsed <= self._gt:
             return
@@ -249,13 +276,21 @@ class VersionRange:
         if parsed >= self._le:
             raise ValueError(f"Version clash: >={value}")
 
-    def set_greater_equal(self, value: str, parsed: Version):
+    def set_greater_equal(self, value: str, parsed: Version, force: bool = True):
 
         if self.eq:
             if parsed <= self._eq:
                 return
             else:
                 raise ValueError(f"Version clash: <={value}")
+
+        if self.ge and self._ge == parsed and not force:
+            if len(self.ge) > len(value):
+                return
+            else:
+                self.ge = value
+                self._ge = parsed
+                return
 
         if parsed <= self._ge:
             return
@@ -299,6 +334,21 @@ class VersionRange:
                 self.le == other.le,
                 self.gt == other.gt,
                 self.ge == other.ge,
+            ]
+        )
+
+    def same(self, other) -> bool:
+        """
+        Return True if the two VersionSpecs point to the same range,
+        ignoring the string representation.
+        """
+        return all(
+            [
+                self._eq == other._eq,
+                self._lt == other._lt,
+                self._le == other._le,
+                self._gt == other._gt,
+                self._ge == other._ge,
             ]
         )
 
@@ -418,15 +468,32 @@ def _mymerge(a: VersionRange, b: VersionRange) -> VersionRange:
     ret = copy.deepcopy(a)
 
     if b.lt:
-        ret.set_less(b.lt, b._lt)
+        ret.set_less(b.lt, b._lt, False)
     if b.le:
-        ret.set_less_equal(b.le, b._le)
+        ret.set_less_equal(b.le, b._le, False)
     if b.gt:
-        ret.set_greater(b.gt, b._gt)
+        ret.set_greater(b.gt, b._gt, False)
     if b.ge:
-        ret.set_greater_equal(b.ge, b._ge)
+        ret.set_greater_equal(b.ge, b._ge, False)
     if b.eq:
-        ret.set_equal(b.eq, b._eq)
+        ret.set_equal(b.eq, b._eq, False)
+
+    if ret.same(a) and ret.same(b):
+        n = 0
+        if a.lt:
+            n += len(a.lt) - len(b.lt)
+        if a.le:
+            n += len(a.le) - len(b.le)
+        if a.gt:
+            n += len(a.gt) - len(b.gt)
+        if a.ge:
+            n += len(a.ge) - len(b.ge)
+        if a.eq:
+            n += len(a.eq) - len(b.eq)
+        if n >= 0:
+            return a
+        else:
+            return b
 
     if ret == a:
         return a
@@ -454,6 +521,21 @@ def _interpret(dependency: str) -> dict:
         dep, comment = dep.split("#", 1)
         warnings.warn(f"Comment '{comment}' ignored.", Warning)
 
+    # foo ==1.0
+
+    if re.match(r"^([^=^<^>^\s]*)(\s*)(==)(.*)$", dep):
+
+        _, name, _, eq, version, _ = re.split(r"^([^=^<^>^\s]*)(\s*)(==)(.*)$", dep)
+
+        if "=" in version:
+            raise ValueError(f"Invalid build specifier '{dep}'.")
+
+        return {
+            "name": name,
+            "wildcard": eq + version,
+            "range": VersionRange(equal=version),
+        }
+
     # foo =1.0=abc
 
     if re.match(r"^([^=^<^>^\s]*)(\s*)([=]+)([^=^<^>^\s]*)(\s*)([=]+)(.*)$", dep):
@@ -463,10 +545,10 @@ def _interpret(dependency: str) -> dict:
         )
 
         if eq != "=":
-            raise ValueError(f"Invalid wildcard dependency '{dep}'.")
+            raise ValueError(f"Invalid version specification '{dep}'.")
 
         if eq2 != "=":
-            raise ValueError(f"Invalid wildcard dependency '{dep}'.")
+            raise ValueError(f"Invalid build specifier '{dep}'.")
 
         return {"name": name, "build": build, "range": VersionRange(equal=version)}
 
@@ -502,6 +584,39 @@ def _interpret(dependency: str) -> dict:
         return {
             "name": name,
             "wildcard": eq + basename + wildcard,
+            "range": VersionRange(greater_equal=lower, less=upper),
+        }
+
+    # foo =1.0
+
+    if re.match(r"^([^=^<^>^\s]*)(\s*)([=]+)([^=^<^>^\s]*)$", dep):
+
+        _, name, _, eq, basename, _ = re.split(r"^([^=^\s]*)(\s*)([=]+)(.*)$", dep)
+
+        if eq != "=":
+            raise ValueError(f"Invalid version specification '{dep}'.")
+
+        if len(basename.split(".")) == 0:
+            lower = basename
+            upper = f"{int(lower) + 1}"
+        else:
+            lower = basename.rstrip(".")
+            if len(lower.split(".")) == 1:
+                upper = f"{int(lower) + 1}"
+                if basename[-1] == ".":
+                    upper += ".0"
+            else:
+                base, minor = lower.rsplit(".", 1)
+                upper = f"{base}.{int(minor) + 1}.0"
+
+        if len(lower) == 0:
+            lower = "0"
+        else:
+            lower = f"{lower}.0"
+
+        return {
+            "name": name,
+            "wildcard": eq + basename,
             "range": VersionRange(greater_equal=lower, less=upper),
         }
 
@@ -653,6 +768,19 @@ class PackageSpecifier:
                     if self.build != other.build:
                         raise ValueError(f"Cannot combine '{self}' with '{other}'")
                 self.build = other.build
+            return self
+
+        if r.same(self.range) and r.same(other.range):
+            if self.wildcard and not other.wildcard:
+                return self
+            if other.wildcard and not self.wildcard:
+                return other
+            if self.build and not other.build:
+                return self
+            if other.build and not self.build:
+                return other
+            assert self.wildcard == other.wildcard
+            assert self.build == other.build
             return self
 
         if r == self.range:
