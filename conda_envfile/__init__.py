@@ -478,29 +478,6 @@ def _mymerge(a: VersionRange, b: VersionRange) -> VersionRange:
     if b.eq:
         ret.set_equal(b.eq, b._eq, False)
 
-    if ret.same(a) and ret.same(b):
-        n = 0
-        if a.lt:
-            n += len(a.lt) - len(b.lt)
-        if a.le:
-            n += len(a.le) - len(b.le)
-        if a.gt:
-            n += len(a.gt) - len(b.gt)
-        if a.ge:
-            n += len(a.ge) - len(b.ge)
-        if a.eq:
-            n += len(a.eq) - len(b.eq)
-        if n >= 0:
-            return a
-        else:
-            return b
-
-    if ret == a:
-        return a
-
-    if ret == b:
-        return b
-
     return ret
 
 
@@ -661,6 +638,15 @@ def _interpret(dependency: str) -> dict:
     return ret
 
 
+def _merge_property(a, b):
+    if a is None:
+        return b
+    if b is None:
+        return a
+    assert a == b
+    return a
+
+
 class PackageSpecifier:
     """
     Interpret a package specifier, e.g.::
@@ -758,29 +744,14 @@ class PackageSpecifier:
         r = self.range + other.range
 
         if r == self.range and r == other.range:
-            if other.wildcard:
-                if self.wildcard:
-                    if self.wildcard != other.wildcard:
-                        raise ValueError(f"Cannot combine '{self}' with '{other}'")
-                self.wildcard = other.wildcard
-            if other.build:
-                if self.build:
-                    if self.build != other.build:
-                        raise ValueError(f"Cannot combine '{self}' with '{other}'")
-                self.build = other.build
+            self.wildcard = _merge_property(self.wildcard, other.wildcard)
+            self.build = _merge_property(self.build, other.build)
             return self
 
         if r.same(self.range) and r.same(other.range):
-            if self.wildcard and not other.wildcard:
-                return self
-            if other.wildcard and not self.wildcard:
-                return other
-            if self.build and not other.build:
-                return self
-            if other.build and not self.build:
-                return other
-            assert self.wildcard == other.wildcard
-            assert self.build == other.build
+            self.wildcard = _merge_property(self.wildcard, other.wildcard)
+            self.build = _merge_property(self.build, other.build)
+            self.range = r
             return self
 
         if r == self.range:
@@ -789,8 +760,8 @@ class PackageSpecifier:
         if r == other.range:
             return other
 
-        self.build = None
         self.wildcard = None
+        self.build = None
         self.range = r
         return self
 
