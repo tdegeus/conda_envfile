@@ -358,7 +358,7 @@ class VersionRange:
     def __str__(self) -> str:
         ret = []
         if self.eq:
-            ret.append("=" + self.eq)
+            ret.append("==" + self.eq)
         if self.gt:
             ret.append(">" + self.gt)
         if self.ge:
@@ -724,12 +724,13 @@ class PackageSpecifier:
         if self.wildcard:
             return f"{self.name} {self.wildcard}"
 
-        ret = f"{self.name} {self.range}"
-
         if self.build:
-            ret += f"={self.build}"
+            return f"{self.name}={self.range.eq}={self.build}"
 
-        return ret.rstrip()
+        if self.range.isempty():
+            return self.name
+
+        return f"{self.name} {self.range}".replace("==", "=")
 
     def __repr__(self) -> str:
         return str(self)

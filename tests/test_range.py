@@ -18,8 +18,8 @@ class Test(unittest.TestCase):
             [dict(greater="0.0", less="1.0", less_equal="1.0"), ">0.0, <1.0"],
             [dict(greater_equal="0.0", less="1.0"), ">=0.0, <1.0"],
             [dict(greater_equal="0.0", less_equal="1.0"), ">=0.0, <=1.0"],
-            [dict(greater_equal="1.0", less_equal="1.0"), "=1.0"],
-            [dict(greater_equal="0.0", less_equal="3.0", equal="2.0"), "=2.0"],
+            [dict(greater_equal="1.0", less_equal="1.0"), "==1.0"],
+            [dict(greater_equal="0.0", less_equal="3.0", equal="2.0"), "==2.0"],
         ]
 
         for range, expect in tests:
