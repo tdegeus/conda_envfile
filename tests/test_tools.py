@@ -26,6 +26,10 @@ class Test(unittest.TestCase):
                 ["foo =1.2"],
             ],
             [
+                ["foo >=1.2", "foo <=1.2", "foo ==1.2.0"],
+                ["foo ==1.2.0"],
+            ],
+            [
                 ["foo", "foo", "foo"],
                 ["foo"],
             ],

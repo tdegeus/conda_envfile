@@ -9,6 +9,7 @@ class Test(unittest.TestCase):
     def test_build(self):
 
         v = conda_envfile.PackageSpecifier("foo=1.0=pypy")
+        self.assertEqual(str(v), "foo =1.0=pypy")
         self.assertEqual(v.name, "foo")
         self.assertEqual(v.version, "=1.0")
         self.assertEqual(str(v.range), "=1.0")
@@ -16,13 +17,15 @@ class Test(unittest.TestCase):
         self.assertEqual(v.wildcard, None)
 
         v = conda_envfile.PackageSpecifier("foo=1.0")
+        self.assertEqual(str(v), "foo =1.0")
         self.assertEqual(v.name, "foo")
         self.assertEqual(v.version, "=1.0")
-        self.assertEqual(str(v.range), "=1.0")
+        self.assertEqual(str(v.range), ">=1.0.0, <1.1.0")
         self.assertEqual(v.build, None)
-        self.assertEqual(v.wildcard, None)
+        self.assertEqual(v.wildcard, "=1.0")
 
         v = conda_envfile.PackageSpecifier("foo=1.*")
+        self.assertEqual(str(v), "foo =1.*")
         self.assertEqual(v.name, "foo")
         self.assertEqual(v.version, "=1.*")
         self.assertEqual(str(v.range), ">=1.0, <2.0")
@@ -30,14 +33,37 @@ class Test(unittest.TestCase):
         self.assertEqual(v.wildcard, "=1.*")
 
         v = conda_envfile.PackageSpecifier("foo *")
+        self.assertEqual(str(v), "foo *")
         self.assertEqual(v.name, "foo")
         self.assertEqual(v.version, "*")
         self.assertEqual(str(v.range), "")
         self.assertEqual(v.build, None)
         self.assertEqual(v.wildcard, "*")
 
+        v = conda_envfile.PackageSpecifier("foo==1.0.0")
+        self.assertEqual(str(v), "foo ==1.0.0")
+        self.assertEqual(v.name, "foo")
+        self.assertEqual(v.version, "==1.0.0")
+        self.assertEqual(str(v.range), "=1.0.0")
+        self.assertEqual(v.build, None)
+        self.assertEqual(v.wildcard, "==1.0.0")
+
+    def test_merge(self):
+
+        tests = [
+            ["foo ==1.2.0", "foo =1.2", "foo ==1.2.0"],
+            ["foo >=1.2, <1.3", "foo =1.2", "foo =1.2"],
+        ]
+
+        for a, b, ret in tests:
+            a = conda_envfile.PackageSpecifier(a)
+            b = conda_envfile.PackageSpecifier(b)
+            self.assertEqual(str(a + b), ret)
+            self.assertEqual(str(b + a), ret)
+
     def test_PackageSpecifier_in(self):
 
+        self.assertTrue("foo ==1.0" in conda_envfile.PackageSpecifier("foo ==1.0"))
         self.assertTrue("foo =1.0" in conda_envfile.PackageSpecifier("foo =1.0"))
         self.assertTrue("foo >=1.0, <=1.0" in conda_envfile.PackageSpecifier("foo =1.0"))
         self.assertTrue("foo =1.0" not in conda_envfile.PackageSpecifier("foo =2.0"))
