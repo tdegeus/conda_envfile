@@ -9,10 +9,10 @@ class Test(unittest.TestCase):
     def test_build(self):
 
         v = conda_envfile.PackageSpecifier("foo=1.0=pypy")
-        self.assertEqual(str(v), "foo =1.0=pypy")
+        self.assertEqual(str(v), "foo=1.0=pypy")
         self.assertEqual(v.name, "foo")
-        self.assertEqual(v.version, "=1.0")
-        self.assertEqual(str(v.range), "=1.0")
+        self.assertEqual(v.version, "==1.0")
+        self.assertEqual(str(v.range), "==1.0")
         self.assertEqual(v.build, "pypy")
         self.assertEqual(v.wildcard, None)
 
@@ -44,7 +44,7 @@ class Test(unittest.TestCase):
         self.assertEqual(str(v), "foo ==1.0.0")
         self.assertEqual(v.name, "foo")
         self.assertEqual(v.version, "==1.0.0")
-        self.assertEqual(str(v.range), "=1.0.0")
+        self.assertEqual(str(v.range), "==1.0.0")
         self.assertEqual(v.build, None)
         self.assertEqual(v.wildcard, "==1.0.0")
 
