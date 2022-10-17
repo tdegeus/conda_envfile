@@ -9,6 +9,7 @@ from collections import defaultdict
 import click
 import packaging.specifiers
 import packaging.version
+import prettytable
 import yaml
 from jinja2 import BaseLoader
 from jinja2 import Environment
@@ -858,7 +859,7 @@ def contains(requirements: list[PackageSpecifier], installed: list[PackageSpecif
     Check if all dependencies in ``requirements`` are satisfied by ``installed``.
 
     :param requirements: List of requirements.
-    :param install: List of 'installed' dependencies.
+    :param installed: List of 'installed' dependencies.
     :return: True if all requirements are satisfied, False otherwise.
     """
 
@@ -871,6 +872,43 @@ def contains(requirements: list[PackageSpecifier], installed: list[PackageSpecif
             return False
 
     return True
+
+
+def print_diff(
+    a: list[PackageSpecifier], b: list[PackageSpecifier], silent: bool = False
+) -> prettytable.PrettyTable:
+    """
+    Print differences between ``a`` and ``b``.
+
+    :param a: List of dependencies.
+    :param b: List of dependencies.
+    :param silent: Do not print the table.
+    :return: PrettyTable object.
+    """
+
+    a = {i.name: i for i in map(PackageSpecifier, a)}
+    b = {i.name: i for i in map(PackageSpecifier, b)}
+    out = prettytable.PrettyTable()
+    out.field_names = ["a", "diff", "b"]
+    out.align["a"] = "l"
+    out.align["diff"] = "c"
+    out.align["b"] = "l"
+    out.header = False
+
+    for key in a:
+        if key not in b:
+            out.add_row([str(a[key]), "->", ""])
+            continue
+        if a[key] not in b[key]:
+            out.add_row([str(a[key]), "!=", str(b[key])])
+            continue
+
+    for key in b:
+        if key not in a:
+            out.add_row(["", "<-", str(b[key])])
+
+    print(out.get_string())
+    return out
 
 
 def condaforge_dependencies(
