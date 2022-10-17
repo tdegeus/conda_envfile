@@ -6,6 +6,7 @@ dependencies:
 - jinja2
 - packaging
 - pre-commit
+- prettytable
 - python
 - pyyaml
 - setuptools_scm
