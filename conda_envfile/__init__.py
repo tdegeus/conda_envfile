@@ -1053,6 +1053,44 @@ def _iterate_nested_dict(mydict: dict):
             yield from _iterate_nested_dict(value)
 
 
+def apply_selector(text: str) -> str:
+    """
+    Apply platform selector::
+
+        sel(linux): ...
+        sel(osx): ...
+        sel(win): ...
+
+    based on current platform.
+
+    :param text: Package specifier with optional selector.
+    :return: Package specifier. Returns ``None`` is excluded by selector.
+    """
+
+    if re.match(r"(\s*)(sel\(\w*\)\:)(.*)", text):
+        _, _, _, plat, _, package, _ = re.split(r"(\s*)(sel\()(\w*)(\)\:\s*)(.*)", text)
+        if (sys.platform == "linux" or sys.platform == "linux2") and plat == "linux":
+            return package
+        elif sys.platform == "darwin" and plat == "osx":
+            return package
+        elif sys.platform == "win32" and plat == "win":
+            return package
+        else:
+            return None
+
+    return text
+
+
+def filter_selectors(deps: list[str]) -> list[str]:
+    """
+    Filter selectors from dependencies.
+
+    :param deps: List of dependencies (text).
+    :return: List of dependencies (text) without selectors, and dependencies excluded by selectors.
+    """
+    return [apply_selector(i) for i in deps if apply_selector(i)]
+
+
 def parse_github_action(text: str) -> dict:
     """
     Parse a GitHub action.
@@ -1090,15 +1128,8 @@ def parse_github_action(text: str) -> dict:
 
         if "extra-specs" in data:
             for deps in data["extra-specs"]:
-                if re.match(r"(\s*)(sel\(\w*\)\:)(.*)", deps):
-                    _, _, _, plat, _, package, _ = re.split(r"(\s*)(sel\()(\w*)(\)\:\s*)(.*)", deps)
-                    if (sys.platform == "linux" or sys.platform == "linux2") and plat == "linux":
-                        env["dependencies"].append(package)
-                    elif sys.platform == "darwin" and plat == "osx":
-                        env["dependencies"].append(package)
-                    elif sys.platform == "win32" and plat == "win":
-                        env["dependencies"].append(package)
-                else:
+                deps = apply_selector(deps)
+                if deps:
                     env["dependencies"].append(deps)
 
         return env
@@ -1219,10 +1250,10 @@ def conda_envfile_merge(args: list[str]):
                     else:
                         env[key] += extra[key]
 
-    env["dependencies"] = unique(*(env["dependencies"] + args.append))
+    env["dependencies"] = unique(*(env["dependencies"] + filter_selectors(args.append)))
 
     if args.remove:
-        env["dependencies"] = remove(env["dependencies"], *args.remove)
+        env["dependencies"] = remove(env["dependencies"], *filter_selectors(args.remove))
 
     env["dependencies"] = list(map(str, env["dependencies"]))
 
@@ -1294,7 +1325,7 @@ def _conda_envfile_restrict_parser():
         action="append",
         help="Interpret the next file (``source`` or ``comparison``) as conda-forge feedstock.",
     )
-    parser.add_argument("-a", "--append", type=str, action="append", help="Append dependencies.")
+    parser.add_argument("-a", "--append", type=str, action="append", default=[], help="Append deps")
     parser.add_argument("--version", action="version", version=version)
     parser.add_argument("source", type=str, nargs="?", help="Input file.")
     parser.add_argument("comparison", type=str, nargs="*", help="Comparison file(s).")
@@ -1311,9 +1342,6 @@ def conda_envfile_restrict(args: list[str]):
     parser = _conda_envfile_restrict_parser()
     args = parser.parse_args(args)
 
-    if args.append is None:
-        args.append = []
-
     if len(args.conda_forge) > 0:
         other = []
         with open(args.conda_forge[0]) as file:
@@ -1325,7 +1353,7 @@ def conda_envfile_restrict(args: list[str]):
         for filename in args.conda_forge[1:]:
             with open(filename) as file:
                 other += condaforge_dependencies(file.read())
-        ret = restrict(source, unique(*(other + args.append)))
+        ret = restrict(source, unique(*(other + filter_selectors(args.append))))
         if ret != source:
             print("Difference found")
             print("\n".join([i for i in ret if i not in source]))
@@ -1339,7 +1367,7 @@ def conda_envfile_restrict(args: list[str]):
     for filename in args.comparison:
         other += parse_file(filename)["dependencies"]
 
-    env["dependencies"] = restrict(source, unique(*(other + args.append)))
+    env["dependencies"] = restrict(source, unique(*(other + filter_selectors(args.append))))
     env["dependencies"] = list(map(str, *env["dependencies"]))
 
     if not args.output:
