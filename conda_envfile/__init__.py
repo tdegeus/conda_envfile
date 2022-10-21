@@ -1005,7 +1005,7 @@ def parse_file(*args: list[str]) -> dict:
     Parse one or more files and return the raw result.
 
     :param args: List of filenames to parse.
-    :return: Raw result.
+    :return: Raw result: ``{"name": [...], "channels": [...], "dependencies": [...]}``
     """
 
     env = {"name": [], "channels": [], "dependencies": []}
@@ -1038,9 +1038,72 @@ def parse_file(*args: list[str]) -> dict:
     else:
         del env["name"]
 
+    if len(env["channels"]) == 0:
+        del env["channels"]
+
     env["dependencies"] = [PackageSpecifier(i) for i in env["dependencies"]]
 
     return env
+
+
+def _iterate_nested_dict(mydict: dict):
+    for key, value in mydict.items():
+        yield key, value
+        if isinstance(value, dict):
+            yield from _iterate_nested_dict(value)
+
+
+def parse_github_action(text: str) -> dict:
+    """
+    Parse a GitHub action.
+    Currently very basic. Looks for the first occurrence of ``mamba-org/provision-with-micromamba``.
+
+    :param filename: Filename to parse.
+    :return: Raw result: ``{"name": [...], "channels": [...], "dependencies": [...]}``
+    """
+
+    if "mamba-org/provision-with-micromamba" in text:
+        data = text.split("mamba-org/provision-with-micromamba")[1].split("with:")[1]
+        data = data.split("\n")
+        if len(data[0].strip()) == 0:
+            data = data[1:]
+        indent = len(re.split(r"(\s*)(.*)", data[0])[1])
+        select = []
+        for line in data:
+            if len(re.split(r"(\s*)(.*)", line)[1]) < indent:
+                break
+            if re.match(r"(\s*)(-\s)(.*)", line):
+                break
+            select += [line]
+        data = yaml.load("\n".join(select), Loader=yaml.FullLoader)
+
+        for key in data:
+            if type(data[key]) == str:
+                data[key] = data[key].split("\n")
+
+        if "environment-file" in data:
+            env = parse_file(*data["environment-file"])
+        else:
+            env = {"dependencies": []}
+        if "environment-name" in data:
+            env["name"] = data["environment-name"]
+
+        if "extra-specs" in data:
+            for deps in data["extra-specs"]:
+                if re.match(r"(\s*)(sel\(\w*\)\:)(.*)", deps):
+                    _, _, _, plat, _, package, _ = re.split(r"(\s*)(sel\()(\w*)(\)\:\s*)(.*)", deps)
+                    if (sys.platform == "linux" or sys.platform == "linux2") and plat == "linux":
+                        env["dependencies"].append(package)
+                    elif sys.platform == "darwin" and plat == "osx":
+                        env["dependencies"].append(package)
+                    elif sys.platform == "win32" and plat == "win":
+                        env["dependencies"].append(package)
+                else:
+                    env["dependencies"].append(deps)
+
+        return env
+
+    return {}
 
 
 def _conda_envfile_parse_parser():
@@ -1123,8 +1186,15 @@ def _conda_envfile_merge_parser():
     parser.add_argument("-o", "--output", type=str, help="Write to output file.")
     parser.add_argument("-a", "--append", type=str, action="append", default=[], help="Append deps")
     parser.add_argument("-r", "--remove", type=str, action="append", default=[], help="Remove deps")
-    parser.add_argument("--version", action="version", version=version)
-    parser.add_argument("files", type=str, nargs="*", help="Input files.")
+    parser.add_argument("--no-name", action="store_true", help="Remove name from output.")
+    parser.add_argument(
+        "--github-action",
+        type=str,
+        action="append",
+        default=[],
+        help="Interpret file as GitHub action",
+    )
+    parser.add_argument("files", type=str, nargs="*", help="Input file(s).")
     return parser
 
 
@@ -1138,12 +1208,32 @@ def conda_envfile_merge(args: list[str]):
     parser = _conda_envfile_merge_parser()
     args = parser.parse_args(args)
     env = parse_file(*args.files)
+
+    if args.github_action:
+        for filename in args.github_action:
+            with open(filename) as file:
+                extra = parse_github_action(file.read())
+                for key in extra:
+                    if key not in env:
+                        env[key] = extra[key]
+                    else:
+                        env[key] += extra[key]
+
     env["dependencies"] = unique(*(env["dependencies"] + args.append))
 
     if args.remove:
         env["dependencies"] = remove(env["dependencies"], *args.remove)
 
     env["dependencies"] = list(map(str, env["dependencies"]))
+
+    for key in env:
+        if key == "dependencies":
+            continue
+        if type(env[key]) == list:
+            env[key] = list(set(env[key]))
+
+    if args.no_name:
+        env.pop("name", None)
 
     if not args.output:
         print(yaml.dump(env, default_flow_style=False, default_style="").strip())
