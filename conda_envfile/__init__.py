@@ -3,6 +3,7 @@ import copy
 import os
 import re
 import sys
+import textwrap
 import warnings
 from collections import defaultdict
 
@@ -907,7 +908,9 @@ def print_diff(
         if key not in a:
             out.add_row(["", "<-", str(b[key])])
 
-    print(out.get_string())
+    if not silent:
+        print(out.get_string())
+
     return out
 
 
@@ -1045,8 +1048,26 @@ def _conda_envfile_parse_parser():
     Return parser for :py:func:`conda_envfile_parse`.
     """
 
-    desc = "Parse YAML environnement files."
-    parser = argparse.ArgumentParser(description=desc)
+    desc = """
+    Parse YAML environment files, formatted::
+
+        name: ...
+        channels:
+        - ...
+        - ...
+        dependencies:
+        - ...
+        - ...
+    """
+
+    class MyFmt(
+        argparse.RawDescriptionHelpFormatter,
+        argparse.ArgumentDefaultsHelpFormatter,
+        argparse.MetavarTypeHelpFormatter,
+    ):
+        pass
+
+    parser = argparse.ArgumentParser(formatter_class=MyFmt, description=textwrap.dedent(desc))
     parser.add_argument("--version", action="version", version=version)
     parser.add_argument("files", type=str, nargs="*", help="Input files.")
     return parser
@@ -1054,7 +1075,8 @@ def _conda_envfile_parse_parser():
 
 def conda_envfile_parse(args: list[str]):
     """
-    Command-line tool to print datasets from a file, see ``--help``.
+    Command-line tool, see ``--help``.
+
     :param args: Command-line arguments (should be all strings).
     """
 
@@ -1077,8 +1099,26 @@ def _conda_envfile_merge_parser():
     Return parser for :py:func:`conda_envfile_merge`.
     """
 
-    desc = "Merge YAML environnement files."
-    parser = argparse.ArgumentParser(description=desc)
+    desc = """
+    Merge YAML environment files, formatted::
+
+        name: ...
+        channels:
+        - ...
+        - ...
+        dependencies:
+        - ...
+        - ...
+    """
+
+    class MyFmt(
+        argparse.RawDescriptionHelpFormatter,
+        argparse.ArgumentDefaultsHelpFormatter,
+        argparse.MetavarTypeHelpFormatter,
+    ):
+        pass
+
+    parser = argparse.ArgumentParser(formatter_class=MyFmt, description=textwrap.dedent(desc))
     parser.add_argument("-f", "--force", action="store_true", help="Force overwrite output file.")
     parser.add_argument("-o", "--output", type=str, help="Write to output file.")
     parser.add_argument("-a", "--append", type=str, action="append", default=[], help="Append deps")
@@ -1090,7 +1130,8 @@ def _conda_envfile_merge_parser():
 
 def conda_envfile_merge(args: list[str]):
     """
-    Command-line tool to print datasets from a file, see ``--help``.
+    Command-line tool, see ``--help``.
+
     :param args: Command-line arguments (should be all strings).
     """
 
@@ -1137,19 +1178,32 @@ def _conda_envfile_restrict_parser():
     desc = """
     Restrict version of packages based on another YAML file. Example::
 
-        conda_envfile_restrict env1.yml env2.yml > env3.yml
+        conda_envfile_restrict source.yml env.yml ... > source_restricted.yml
 
-    To check conda-forge recipes, use::
+    To check conda-forge feedstocks, use::
 
-        conda_envfile_restrict --conda meta.yml env2.yml
+        conda_envfile_restrict --conda-forge meta.yml env.yml
 
-    In this case, this function only checks and outputs a ``1`` return code if the conda file
-    is not restrictive enough.
+    In this case, this function only checks and outputs a ``1`` return code if the feedstock
+    is not restrictive enough. It does not print a formatted output of ``source``.
     """
-    parser = argparse.ArgumentParser(description=desc)
+
+    class MyFmt(
+        argparse.RawDescriptionHelpFormatter,
+        argparse.ArgumentDefaultsHelpFormatter,
+        argparse.MetavarTypeHelpFormatter,
+    ):
+        pass
+
+    parser = argparse.ArgumentParser(formatter_class=MyFmt, description=textwrap.dedent(desc))
     parser.add_argument("-f", "--force", action="store_true", help="Force overwrite output file.")
     parser.add_argument("-o", "--output", type=str, help="Write to output file.")
-    parser.add_argument("-c", "--conda", type=str, action="append", help="Interpret as conda file.")
+    parser.add_argument(
+        "--conda-forge",
+        type=str,
+        action="append",
+        help="Interpret the next file (``source`` or ``comparison``) as conda-forge feedstock.",
+    )
     parser.add_argument("-a", "--append", type=str, action="append", help="Append dependencies.")
     parser.add_argument("--version", action="version", version=version)
     parser.add_argument("source", type=str, nargs="?", help="Input file.")
@@ -1159,7 +1213,8 @@ def _conda_envfile_restrict_parser():
 
 def conda_envfile_restrict(args: list[str]):
     """
-    Command-line tool to print datasets from a file, see ``--help``.
+    Command-line tool, see ``--help``.
+
     :param args: Command-line arguments (should be all strings).
     """
 
@@ -1169,15 +1224,15 @@ def conda_envfile_restrict(args: list[str]):
     if args.append is None:
         args.append = []
 
-    if len(args.conda) > 0:
+    if len(args.conda_forge) > 0:
         other = []
-        with open(args.conda[0]) as file:
+        with open(args.conda_forge[0]) as file:
             source = unique(*condaforge_dependencies(file.read()))
         if args.source:
             other += parse_file(args.source)["dependencies"]
         for filename in args.comparison:
             other += parse_file(filename)["dependencies"]
-        for filename in args.conda[1:]:
+        for filename in args.conda_forge[1:]:
             with open(filename) as file:
                 other += condaforge_dependencies(file.read())
         ret = restrict(source, unique(*(other + args.append)))
@@ -1220,3 +1275,61 @@ def conda_envfile_restrict(args: list[str]):
 
 def _conda_envfile_restrict_cli():
     conda_envfile_restrict(sys.argv[1:])
+
+
+def _conda_envfile_diff_parser():
+    """
+    Return parser for :py:func:`conda_envfile_diff`.
+    """
+
+    desc = """
+    Print diff of two files.
+    """
+
+    class MyFmt(
+        argparse.RawDescriptionHelpFormatter,
+        argparse.ArgumentDefaultsHelpFormatter,
+        argparse.MetavarTypeHelpFormatter,
+    ):
+        pass
+
+    parser = argparse.ArgumentParser(formatter_class=MyFmt, description=textwrap.dedent(desc))
+    parser.add_argument(
+        "--conda-forge",
+        type=str,
+        action="append",
+        default=[],
+        help="Interpret the next file (``a`` or ``b``) as conda-forge feedstock.",
+    )
+    parser.add_argument("--version", action="version", version=version)
+    parser.add_argument("files", type=str, nargs="*", help="Input files.")
+    return parser
+
+
+def conda_envfile_diff(args: list[str]):
+    """
+    Command-line tool, see ``--help``.
+
+    :param args: Command-line arguments (should be all strings).
+    """
+
+    parser = _conda_envfile_diff_parser()
+    args = parser.parse_args(args)
+
+    diff = []
+    for filename in args.files:
+        diff += [parse_file(filename)["dependencies"]]
+        print(diff)
+
+    for filename in args.conda_forge:
+        with open(filename) as file:
+            diff += [unique(*condaforge_dependencies(file.read()))]
+
+    if len(diff) != 2:
+        raise ValueError("Need exactly two files")
+
+    print_diff(*diff)
+
+
+def _conda_envfile_diff_cli():
+    conda_envfile_diff(sys.argv[1:])
