@@ -1213,6 +1213,7 @@ def _conda_envfile_merge_parser():
         pass
 
     parser = argparse.ArgumentParser(formatter_class=MyFmt, description=textwrap.dedent(desc))
+    parser.add_argument("--version", action="version", version=version)
     parser.add_argument("-f", "--force", action="store_true", help="Force overwrite output file.")
     parser.add_argument("-o", "--output", type=str, help="Write to output file.")
     parser.add_argument("-a", "--append", type=str, action="append", default=[], help="Append deps")
@@ -1317,6 +1318,7 @@ def _conda_envfile_restrict_parser():
         pass
 
     parser = argparse.ArgumentParser(formatter_class=MyFmt, description=textwrap.dedent(desc))
+    parser.add_argument("--version", action="version", version=version)
     parser.add_argument("-f", "--force", action="store_true", help="Force overwrite output file.")
     parser.add_argument("-o", "--output", type=str, help="Write to output file.")
     parser.add_argument(
@@ -1326,7 +1328,6 @@ def _conda_envfile_restrict_parser():
         help="Interpret the next file (``source`` or ``comparison``) as conda-forge feedstock.",
     )
     parser.add_argument("-a", "--append", type=str, action="append", default=[], help="Append deps")
-    parser.add_argument("--version", action="version", version=version)
     parser.add_argument("source", type=str, nargs="?", help="Input file.")
     parser.add_argument("comparison", type=str, nargs="*", help="Comparison file(s).")
     return parser
@@ -1412,6 +1413,7 @@ def _conda_envfile_diff_parser():
         pass
 
     parser = argparse.ArgumentParser(formatter_class=MyFmt, description=textwrap.dedent(desc))
+    parser.add_argument("--version", action="version", version=version)
     parser.add_argument(
         "--conda-forge",
         type=str,
@@ -1419,7 +1421,6 @@ def _conda_envfile_diff_parser():
         default=[],
         help="Interpret the next file (``a`` or ``b``) as conda-forge feedstock.",
     )
-    parser.add_argument("--version", action="version", version=version)
     parser.add_argument("files", type=str, nargs="*", help="Input files.")
     return parser
 
