@@ -1181,7 +1181,7 @@ def conda_envfile_parse(args: list[str]):
         env = parse_file(filename)
         env["dependencies"] = list(map(str, unique(*env["dependencies"])))
         with open(filename, "w") as file:
-            yaml.dump(env, file)
+            yaml.dump(env, file, sort_keys=False)
 
 
 def _conda_envfile_parse_cli():
