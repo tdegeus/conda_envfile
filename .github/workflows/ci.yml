@@ -46,3 +46,7 @@ jobs:
 
     - name: Run tests
       run: python -m unittest discover tests -v
+
+    - name: Build docs
+      working-directory: docs
+      run: make html
