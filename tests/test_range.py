@@ -7,7 +7,6 @@ class Test(unittest.TestCase):
     """ """
 
     def test_VersionRange(self):
-
         tests = [
             [{}, ""],
             [dict(less="1.0"), "<1.0"],
@@ -27,7 +26,6 @@ class Test(unittest.TestCase):
             self.assertEqual(str(v), expect)
 
     def test_VersionRange_illegal(self):
-
         tests = [
             dict(less="1.0", greater="1.0"),
             dict(greater="1.2.0", less="1.2.0"),
@@ -41,14 +39,12 @@ class Test(unittest.TestCase):
                 conda_envfile.VersionRange(**range)
 
     def test_VersionRange_merge(self):
-
         p = conda_envfile.VersionRange(less="1.0")
         s = conda_envfile.VersionRange(less="2.0")
         self.assertEqual(str(p + s), "<1.0")
         self.assertEqual(str(s + p), "<1.0")
 
     def test_VersionRange_in(self):
-
         tests = [
             [dict(equal="1.0"), True, dict(equal="1.0")],
             [dict(greater_equal="1.0", less_equal="1.0"), True, dict(equal="1.0")],
@@ -98,5 +94,4 @@ class Test(unittest.TestCase):
 
 
 if __name__ == "__main__":
-
     unittest.main(verbosity=2)
