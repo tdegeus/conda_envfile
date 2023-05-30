@@ -65,7 +65,6 @@ class VersionRange:
         greater: str = None,
         greater_equal: str = None,
     ):
-
         self._eq = _PlusInf
         self._lt = _PlusInf
         self._le = _PlusInf
@@ -108,7 +107,6 @@ class VersionRange:
 
     @equal.setter
     def equal(self, value: str):
-
         if not value:
             self.eq = None
             self._eq = _PlusInf
@@ -118,7 +116,6 @@ class VersionRange:
 
     @less.setter
     def less(self, value: str):
-
         if not value:
             self.lt = None
             self._lt = _PlusInf
@@ -128,7 +125,6 @@ class VersionRange:
 
     @less_equal.setter
     def less_equal(self, value: str):
-
         if not value:
             self.le = None
             self._le = _PlusInf
@@ -138,7 +134,6 @@ class VersionRange:
 
     @greater.setter
     def greater(self, value: str):
-
         if not value:
             self.gt = None
             self._gt = _MinInf
@@ -148,7 +143,6 @@ class VersionRange:
 
     @greater_equal.setter
     def greater_equal(self, value: str):
-
         if not value:
             self.ge = None
             self._ge = _MinInf
@@ -157,7 +151,6 @@ class VersionRange:
         self.set_greater_equal(value, packaging.version.parse(value))
 
     def set_equal(self, value: str, parsed: Version, force: bool = True):
-
         if self.eq:
             if parsed != self._eq:
                 raise ValueError("Can't set equal to two different values")
@@ -186,7 +179,6 @@ class VersionRange:
         self.greater_equal = None
 
     def set_less(self, value: str, parsed: Version, force: bool = True):
-
         if self.eq:
             if parsed > self._eq:
                 return
@@ -216,7 +208,6 @@ class VersionRange:
             raise ValueError(f"Version clash: <={value}")
 
     def set_less_equal(self, value: str, parsed: Version, force: bool = True):
-
         if self.eq:
             if parsed >= self._eq:
                 return
@@ -249,7 +240,6 @@ class VersionRange:
             self.set_equal(value, parsed)
 
     def set_greater(self, value: str, parsed: Version, force: bool = True):
-
         if self.eq:
             if parsed < self._eq:
                 return
@@ -279,7 +269,6 @@ class VersionRange:
             raise ValueError(f"Version clash: >={value}")
 
     def set_greater_equal(self, value: str, parsed: Version, force: bool = True):
-
         if self.eq:
             if parsed <= self._eq:
                 return
@@ -312,7 +301,6 @@ class VersionRange:
             self.set_equal(value, parsed)
 
     def set(self, cmp: str, value: str = None):
-
         if cmp == "=":
             self.equal = value
         elif cmp == "<":
@@ -384,7 +372,6 @@ class VersionRange:
         return _mymerge(self, other)
 
     def __contains__(self, other):
-
         if self == other:
             return True
 
@@ -448,7 +435,6 @@ class VersionRange:
 
 
 def _mymerge(a: VersionRange, b: VersionRange) -> VersionRange:
-
     if a.isempty():
         return b
 
@@ -503,7 +489,6 @@ def _interpret(dependency: str) -> dict:
     # foo ==1.0
 
     if re.match(r"^([^=^<^>^\s]*)(\s*)(==)(.*)$", dep):
-
         _, name, _, eq, version, _ = re.split(r"^([^=^<^>^\s]*)(\s*)(==)(.*)$", dep)
 
         if "=" in version:
@@ -518,7 +503,6 @@ def _interpret(dependency: str) -> dict:
     # foo =1.0=abc
 
     if re.match(r"^([^=^<^>^\s]*)(\s*)([=]+)([^=^<^>^\s]*)(\s*)([=]+)(.*)$", dep):
-
         _, name, _, eq, version, _, eq2, build, _ = re.split(
             r"^([^=^<^>^\s]*)(\s*)([=]+)([^=^<^>^\s]*)(\s*)([=]+)(.*)$", dep
         )
@@ -534,7 +518,6 @@ def _interpret(dependency: str) -> dict:
     # foo =1.0.*
 
     if re.match(r"^([^=^\s]*)(\s*)([=]+)([^\*]*)(\*)$", dep):
-
         _, name, _, eq, basename, wildcard, _ = re.split(
             r"^([^=^\s]*)(\s*)([=]*)([^\*]*)(\*)$", dep
         )
@@ -569,7 +552,6 @@ def _interpret(dependency: str) -> dict:
     # foo =1.0
 
     if re.match(r"^([^=^<^>^\s]*)(\s*)([=]+)([^=^<^>^\s]*)$", dep):
-
         _, name, _, eq, basename, _ = re.split(r"^([^=^\s]*)(\s*)([=]+)(.*)$", dep)
 
         if eq != "=":
@@ -675,7 +657,6 @@ class PackageSpecifier:
     """
 
     def __init__(self, interpret: str = None):
-
         self.name = None
         self.wildcard = None
         self.build = None
@@ -709,7 +690,6 @@ class PackageSpecifier:
         self.data = _interpret(self.name + " " + value)
 
     def __eq__(self, other) -> bool:
-
         if type(other) == str:
             other = PackageSpecifier(other)
 
@@ -778,7 +758,6 @@ class PackageSpecifier:
         return self.merge(other)
 
     def __contains__(self, other):
-
         if type(other) == str:
             other = PackageSpecifier(other)
 
@@ -1011,12 +990,10 @@ def parse_file(*args: list[str]) -> dict:
     env = {"name": [], "channels": [], "dependencies": []}
 
     for filename in args:
-
         if not os.path.isfile(filename):
             raise FileNotFoundError(filename)
 
         with open(filename) as file:
-
             data = yaml.load(file.read(), Loader=yaml.FullLoader)
 
             for key, value in data.items():

@@ -10,7 +10,6 @@ class Test(unittest.TestCase):
     """ """
 
     def test_condaforge_dependencies(self):
-
         with open(basedir / "condaforge_multioutput.yaml") as file:
             deps = list(map(str, conda_envfile.condaforge_dependencies(file.read())))
 
@@ -54,5 +53,4 @@ class Test(unittest.TestCase):
 
 
 if __name__ == "__main__":
-
     unittest.main(verbosity=2)

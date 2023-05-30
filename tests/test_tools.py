@@ -7,7 +7,6 @@ class Test(unittest.TestCase):
     """ """
 
     def test_unique(self):
-
         dependencies = [
             [
                 ["foo =1.2", "foo >=1.2", "foo <1.3", "foo >1.0", "foo <2.0"],
@@ -95,14 +94,12 @@ class Test(unittest.TestCase):
                     conda_envfile.unique(*[i.replace(" ", "") for i in deps])
 
     def test_remove(self):
-
         self.assertEqual(conda_envfile.remove(["foo", "bar"], "bar"), ["foo"])
         self.assertEqual(conda_envfile.remove(["foo *", "bar *"], "bar"), ["foo *"])
         self.assertEqual(conda_envfile.remove(["foo =1.*", "bar =1.*"], "bar"), ["foo =1.*"])
         self.assertEqual(conda_envfile.remove(["foo >1.0", "bar >1.0"], "bar"), ["foo >1.0"])
 
     def test_contains(self):
-
         requirements = ["foo >1.0", "bar >=2.0"]
         installed = ["foo=2.0=generic", "bar=3.0=generic", "other"]
         self.assertTrue(conda_envfile.contains(requirements, installed))
@@ -111,7 +108,6 @@ class Test(unittest.TestCase):
         self.assertFalse(conda_envfile.contains(requirements, installed))
 
     def test_restrict(self):
-
         self.assertEqual(
             list(map(str, conda_envfile.restrict(["foo", "bar"], ["foo >1.0"]))),
             ["foo >1.0", "bar"],
@@ -124,5 +120,4 @@ class Test(unittest.TestCase):
 
 
 if __name__ == "__main__":
-
     unittest.main(verbosity=2)
