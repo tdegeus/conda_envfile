@@ -664,7 +664,7 @@ class PackageSpecifier:
 
         if interpret is None:
             return
-        elif type(interpret) == PackageSpecifier:
+        elif isinstance(interpret, PackageSpecifier):
             self.name = interpret.name
             self.wildcard = interpret.wildcard
             self.build = interpret.build
@@ -690,7 +690,7 @@ class PackageSpecifier:
         self.data = _interpret(self.name + " " + value)
 
     def __eq__(self, other) -> bool:
-        if type(other) == str:
+        if isinstance(other, str):
             other = PackageSpecifier(other)
 
         return all(
@@ -758,7 +758,7 @@ class PackageSpecifier:
         return self.merge(other)
 
     def __contains__(self, other):
-        if type(other) == str:
+        if isinstance(other, str):
             other = PackageSpecifier(other)
 
         if self == other:
@@ -999,9 +999,9 @@ def parse_file(*args: list[str]) -> dict:
             for key, value in data.items():
                 if key not in env:
                     raise ValueError(f"Unknown key '{key}' in '{filename}'.")
-                if type(value) == str:
+                if isinstance(value, str):
                     env[key].append(value)
-                elif type(value) == list:
+                elif isinstance(value, list):
                     env[key] += value
 
     for key in ["channels", "name"]:
@@ -1093,7 +1093,7 @@ def parse_github_action(text: str) -> dict:
         data = yaml.load("\n".join(select), Loader=yaml.FullLoader)
 
         for key in data:
-            if type(data[key]) == str:
+            if isinstance(data[key], str):
                 data[key] = data[key].split("\n")
 
         if "environment-file" in data:
@@ -1238,7 +1238,7 @@ def conda_envfile_merge(args: list[str]):
     for key in env:
         if key == "dependencies":
             continue
-        if type(env[key]) == list:
+        if isinstance(env[key], list):
             env[key] = list(set(env[key]))
 
     if args.no_name:
