@@ -1,6 +1,7 @@
 import argparse
 import copy
 import os
+import pathlib
 import re
 import sys
 import textwrap
@@ -11,6 +12,7 @@ import click
 import packaging.specifiers
 import packaging.version
 import prettytable
+import toml
 import yaml
 from jinja2 import BaseLoader
 from jinja2 import Environment
@@ -28,6 +30,14 @@ _PlusInf = Version("999999999999")
 _PlusInf._key = _cmpkey(
     epoch=+sys.maxsize, release=(+sys.maxsize,), pre=None, post=None, dev=None, local=None
 )
+
+
+class _MyFmt(
+    argparse.RawDescriptionHelpFormatter,
+    argparse.ArgumentDefaultsHelpFormatter,
+    argparse.MetavarTypeHelpFormatter,
+):
+    pass
 
 
 class VersionRange:
@@ -670,11 +680,14 @@ class PackageSpecifier:
             self.build = interpret.build
             self.range = copy.deepcopy(interpret.range)
         else:
-            data = _interpret(interpret)
-            self.name = data.pop("name", None)
-            self.wildcard = data.pop("wildcard", None)
-            self.build = data.pop("build", None)
-            self.range = data.pop("range", None)
+            self._interpret(interpret)
+
+    def _interpret(self, dependency: str):
+        data = _interpret(dependency)
+        self.name = data.pop("name", None)
+        self.wildcard = data.pop("wildcard", None)
+        self.build = data.pop("build", None)
+        self.range = data.pop("range", None)
 
     @property
     def version(self) -> str:
@@ -687,7 +700,7 @@ class PackageSpecifier:
 
     @version.setter
     def version(self, value: str):
-        self.data = _interpret(self.name + " " + value)
+        self._interpret(self.name + " " + value)
 
     def __eq__(self, other) -> bool:
         if isinstance(other, str):
@@ -1130,15 +1143,7 @@ def _conda_envfile_parse_parser():
         - ...
         - ...
     """
-
-    class MyFmt(
-        argparse.RawDescriptionHelpFormatter,
-        argparse.ArgumentDefaultsHelpFormatter,
-        argparse.MetavarTypeHelpFormatter,
-    ):
-        pass
-
-    parser = argparse.ArgumentParser(formatter_class=MyFmt, description=textwrap.dedent(desc))
+    parser = argparse.ArgumentParser(formatter_class=_MyFmt, description=textwrap.dedent(desc))
     parser.add_argument("--version", action="version", version=version)
     parser.add_argument("files", type=str, nargs="*", help="Input files.")
     return parser
@@ -1181,15 +1186,7 @@ def _conda_envfile_merge_parser():
         - ...
         - ...
     """
-
-    class MyFmt(
-        argparse.RawDescriptionHelpFormatter,
-        argparse.ArgumentDefaultsHelpFormatter,
-        argparse.MetavarTypeHelpFormatter,
-    ):
-        pass
-
-    parser = argparse.ArgumentParser(formatter_class=MyFmt, description=textwrap.dedent(desc))
+    parser = argparse.ArgumentParser(formatter_class=_MyFmt, description=textwrap.dedent(desc))
     parser.add_argument("--version", action="version", version=version)
     parser.add_argument("-f", "--force", action="store_true", help="Force overwrite output file.")
     parser.add_argument("-o", "--output", type=str, help="Write to output file.")
@@ -1286,15 +1283,7 @@ def _conda_envfile_restrict_parser():
     In this case, this function only checks and outputs a ``1`` return code if the feedstock
     is not restrictive enough. It does not print a formatted output of ``source``.
     """
-
-    class MyFmt(
-        argparse.RawDescriptionHelpFormatter,
-        argparse.ArgumentDefaultsHelpFormatter,
-        argparse.MetavarTypeHelpFormatter,
-    ):
-        pass
-
-    parser = argparse.ArgumentParser(formatter_class=MyFmt, description=textwrap.dedent(desc))
+    parser = argparse.ArgumentParser(formatter_class=_MyFmt, description=textwrap.dedent(desc))
     parser.add_argument("--version", action="version", version=version)
     parser.add_argument("-f", "--force", action="store_true", help="Force overwrite output file.")
     parser.add_argument("-o", "--output", type=str, help="Write to output file.")
@@ -1381,15 +1370,7 @@ def _conda_envfile_diff_parser():
     desc = """
     Print diff of two files.
     """
-
-    class MyFmt(
-        argparse.RawDescriptionHelpFormatter,
-        argparse.ArgumentDefaultsHelpFormatter,
-        argparse.MetavarTypeHelpFormatter,
-    ):
-        pass
-
-    parser = argparse.ArgumentParser(formatter_class=MyFmt, description=textwrap.dedent(desc))
+    parser = argparse.ArgumentParser(formatter_class=_MyFmt, description=textwrap.dedent(desc))
     parser.add_argument("--version", action="version", version=version)
     parser.add_argument(
         "--conda-forge",
@@ -1429,3 +1410,113 @@ def conda_envfile_diff(args: list[str]):
 
 def _conda_envfile_diff_cli():
     conda_envfile_diff(sys.argv[1:])
+
+
+def _conda_envfile_pyproject_parser():
+    """
+    Return parser for :py:func:`conda_envfile_pyproject`.
+    """
+
+    desc = """
+    Compare the dependencies in a ``pyproject.toml`` file with an environment file.
+    """
+    parser = argparse.ArgumentParser(formatter_class=_MyFmt, description=textwrap.dedent(desc))
+    parser.add_argument("--version", action="version", version=version)
+    parser.add_argument("pyproject", type=pathlib.Path, help="``pyproject.toml`` file.")
+    parser.add_argument("environment", type=pathlib.Path, help="environment file.")
+    return parser
+
+
+def conda_envfile_pyproject(args: list[str]):
+    """
+    Command-line tool, see ``--help``.
+
+    :param args: Command-line arguments (should be all strings).
+    """
+    parser = _conda_envfile_pyproject_parser()
+    args = parser.parse_args(map(str, args))
+
+    data_tml = toml.loads(args.pyproject.read_text())
+    data_env = parse_file(args.environment)
+    deps_tml = data_tml.get("project", {}).get("dependencies", None)
+    python = data_tml.get("project", {}).get("requires-python", None)
+    deps_env = data_env.get("dependencies", None)
+
+    if deps_env is None or deps_tml is None:
+        return
+
+    deps_tml = list(map(PackageSpecifier, deps_tml))
+    deps_env = list(map(PackageSpecifier, deps_env))
+
+    # list of dependencies in toml mapped to conda package names
+    deps_tml_alias = copy.deepcopy(deps_tml)
+    aliases = {}
+
+    if "conda-forge" in data_env.get("channels", []):
+        aliases = {
+            "FrictionQPotFEM": "python-frictionqpotfem",
+            "FrictionQPotSpringBlock": "python-frictionqpotspringblock",
+            "GMatElastic": "python-gmatelastic",
+            "GMatElastoPlastic": "python-gmatelastoplastic",
+            "GMatElastoPlasticFiniteStrainSimo": "python-gmatelastoplasticfinitestrainsimo",
+            "GMatElastoPlasticQPot": "python-gmatelastoplasticqpot",
+            "GMatNonLinearElastic": "python-gmatnonlinearelastic",
+            "GMatTensor": "python-gmattensor",
+            "GooseEPM": "python-gooseepm",
+            "GooseEYE": "python-gooseeye",
+            "GooseFEM": "python-goosefem",
+            "cppcolormap": "python-cppcolormap",
+            "prrng": "python-prrng",
+        }
+
+    for package in deps_tml_alias:
+        package.name = aliases.get(package.name, package.name.lower())
+
+    # list of most restrictive dependencies
+    extra = []
+    if python is not None:
+        extra.append(PackageSpecifier(f"python {python}"))
+
+    dependencies = defaultdict(PackageSpecifier)
+    for dep in deps_tml_alias + deps_env + extra:
+        dep = PackageSpecifier(dep)
+        dependencies[dep.name] += dep
+
+    change_env = False
+    change_tml = False
+
+    # update toml
+    for i, alias in enumerate(deps_tml_alias):
+        a = str(deps_tml[i].version)
+        b = str(dependencies[alias.name].version)
+        if a < b:
+            change_tml = True
+            deps_tml[i].version = b
+
+    if python is not None:
+        if PackageSpecifier(f"python {python}").version < dependencies["python"].version:
+            change_tml = True
+            python = str(dependencies["python"].version)
+
+    # update env
+    for i, dep in enumerate(deps_env):
+        a = str(dep.version)
+        b = str(dependencies[dep.name].version)
+        if a < b:
+            change_env = True
+            deps_env[i].version = b
+
+    if change_tml:
+        data_tml["project"]["dependencies"] = list(map(str, deps_tml))
+        if python is not None:
+            data_tml["project"]["requires-python"] = python
+        args.pyproject.write_text(toml.dumps(data_tml))
+
+    if change_env:
+        data_env["dependencies"] = list(map(str, deps_env))
+        with open(args.environment, "w") as file:
+            yaml.dump(data_env, file, sort_keys=False)
+
+
+def _conda_envfile_pyproject_cli():
+    conda_envfile_pyproject(sys.argv[1:])

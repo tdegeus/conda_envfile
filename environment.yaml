@@ -13,3 +13,4 @@ dependencies:
 - setuptools_scm
 - sphinx
 - sphinx-argparse
+- toml

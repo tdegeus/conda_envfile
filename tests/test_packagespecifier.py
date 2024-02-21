@@ -3,6 +3,12 @@ import pytest
 import conda_envfile
 
 
+def test_setter():
+    v = conda_envfile.PackageSpecifier("foo >=1.0.0")
+    v.version = ">=2.0.0"
+    assert str(v) == "foo >=2.0.0"
+
+
 def test_build():
     v = conda_envfile.PackageSpecifier("foo=1.0=pypy")
     assert str(v) == "foo=1.0=pypy"
