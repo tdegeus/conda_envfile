@@ -1483,6 +1483,8 @@ def conda_envfile_pyproject(args: list[str]):
     for key, value in args.mapping:
         aliases[key] = value
 
+    inv_aliases = {v: k for k, v in aliases.items()}
+
     for package in deps_tml_alias:
         package.name = aliases.get(package.name, package.name.lower())
 
@@ -1520,6 +1522,28 @@ def conda_envfile_pyproject(args: list[str]):
             change_env = True
             deps_env[i].version = b
 
+    # add missing dependencies
+    if args.from_pyproject:
+        lookup = [i.name for i in deps_env]
+        for dep in deps_tml_alias:
+            if dep.name not in lookup:
+                change_env = True
+                orig = copy.deepcopy(dep)
+                orig.name = aliases.get(dep.name, dep.name)
+                deps_env.append(orig)
+
+    if args.from_environment:
+        lookup = [i.name for i in deps_tml_alias]
+        for dep in deps_env:
+            if dep.name == "python":
+                continue
+            if dep.name not in lookup:
+                change_tml = True
+                orig = copy.deepcopy(dep)
+                orig.name = inv_aliases.get(dep.name, dep.name)
+                deps_tml.append(orig)
+
+    # write updated toml
     if change_tml:
         text = text_tml.splitlines()
         for i in range(len(text)):
@@ -1543,6 +1567,7 @@ def conda_envfile_pyproject(args: list[str]):
         text = text[:start] + ["dependencies = ["] + [f'    "{i}",' for i in deps] + ["]"] + text[end + 1:]
         args.pyproject.write_text("\n".join(text))
 
+    # write updated environment
     if change_env:
         data_env["dependencies"] = list(map(str, deps_env))
         with open(args.environment, "w") as file:
