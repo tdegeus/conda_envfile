@@ -15,6 +15,9 @@ dependencies = ["click >=1.0.0", "Jinja2"]
 description = "Inspect/combine conda YAML environment files"
 requires-python = ">=3.11"
 readme = "README.md"
+
+[project.scripts]
+dependencies = "foo:bar"
 """.strip()
 
     contents_env = """

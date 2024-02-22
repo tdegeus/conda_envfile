@@ -1569,6 +1569,7 @@ def conda_envfile_pyproject(args: list[str]):
             if text[i].strip() == "[project]":
                 break
 
+        start = None
         for i in range(i + 1, len(text)):
             if re.match(r"(dependencies)(\s*)(=)", text[i]):
                 start = i
@@ -1580,8 +1581,10 @@ def conda_envfile_pyproject(args: list[str]):
                 continue
             if re.match(r"(requires-python)(\s*)(=)", text[i]):
                 text[i] = f'requires-python = "{python}"'
-            assert not text[i].strip().startswith("[")
+            if text[i].strip().startswith("["):
+                break
 
+        assert start is not None
         deps = list(map(str, deps_tml))
         text = (
             text[:start]
