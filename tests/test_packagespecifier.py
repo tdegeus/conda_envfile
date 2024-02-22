@@ -11,8 +11,13 @@ def test_setter():
 
 def test_norm():
     tests = [
+        ["foo <= 1.0.0", "foo <=1.0.0"],
+        ["foo < 1.0.0", "foo <1.0.0"],
         ["foo >= 1.0.0", "foo >=1.0.0"],
+        ["foo > 1.0.0", "foo >1.0.0"],
         ["foo = 1.0", "foo =1.0"],
+        ["foo == 1.0", "foo ==1.0"],
+        ["foo *", "foo *"],
     ]
     for a, b in tests:
         v = conda_envfile.PackageSpecifier(a)

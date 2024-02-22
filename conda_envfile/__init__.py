@@ -499,7 +499,7 @@ def _interpret(dependency: str) -> dict:
     # foo ==1.0
 
     if re.match(r"^([^=^<^>^\s]*)(\s*)(==)(.*)$", dep):
-        _, name, _, eq, version, _ = re.split(r"^([^=^<^>^\s]*)(\s*)(==)(.*)$", dep)
+        _, name, _, eq, _, version, _ = re.split(r"^([^=^<^>^\s]*)(\s*)(==)(\s*)(.*)$", dep)
 
         if "=" in version:
             raise ValueError(f"Invalid build specifier '{dep}'.")
