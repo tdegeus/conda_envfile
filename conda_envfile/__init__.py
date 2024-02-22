@@ -1422,8 +1422,8 @@ def _conda_envfile_pyproject_parser():
     """
     parser = argparse.ArgumentParser(formatter_class=_MyFmt, description=textwrap.dedent(desc))
     parser.add_argument("--version", action="version", version=version)
-    parser.add_argument("pyproject", type=pathlib.Path, help="``pyproject.toml`` file.")
     parser.add_argument("environment", type=pathlib.Path, help="environment file.")
+    parser.add_argument("pyproject", type=pathlib.Path, help="``pyproject.toml`` file.")
     return parser
 
 
@@ -1436,8 +1436,13 @@ def conda_envfile_pyproject(args: list[str]):
     parser = _conda_envfile_pyproject_parser()
     args = parser.parse_args(map(str, args))
 
-    text_tml = args.pyproject.read_text()
-    data_tml = tomllib.loads(text_tml)
+    try:
+        text_tml = args.pyproject.read_text()
+        data_tml = tomllib.loads(text_tml)
+    except tomllib.TOMLDecodeError as e:
+        args.pyproject, args.environment = args.environment, args.pyproject
+        text_tml = args.pyproject.read_text()
+        data_tml = tomllib.loads(text_tml)
     data_env = parse_file(args.environment)
     deps_tml = data_tml.get("project", {}).get("dependencies", None)
     python = data_tml.get("project", {}).get("requires-python", None)
