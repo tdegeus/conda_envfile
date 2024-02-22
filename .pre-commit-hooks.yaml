@@ -5,3 +5,10 @@
   entry: conda_envfile_parse
   language: python
   types: [yaml]
+- id: conda_envfile_pyproject
+  name: conda_envfile_pyproject
+  description: Compare dependencies in pyproject.toml to conda environment.yaml
+  minimum_pre_commit_version: 2.1.0
+  entry: conda_envfile_pyproject
+  language: python
+  types: [yaml]
