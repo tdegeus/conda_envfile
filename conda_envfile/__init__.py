@@ -5,6 +5,7 @@ import pathlib
 import re
 import sys
 import textwrap
+import tomllib
 import warnings
 from collections import defaultdict
 
@@ -12,7 +13,6 @@ import click
 import packaging.specifiers
 import packaging.version
 import prettytable
-import tomllib
 import yaml
 from jinja2 import BaseLoader
 from jinja2 import Environment
@@ -1429,10 +1429,29 @@ def _conda_envfile_pyproject_parser():
     """
     parser = argparse.ArgumentParser(formatter_class=_MyFmt, description=textwrap.dedent(desc))
     parser.add_argument("--version", action="version", version=version)
-    parser.add_argument("--mapping", nargs=2, type=str, action="append", default=[], help="Mapping ['pyproject', 'conda']")
-    parser.add_argument("-p", "--from-pyproject", action="store_true", help="Add all dependencies in pyproject to environment")
-    parser.add_argument("-e", "--from-environment", action="store_true", help="Add all dependencies in environment to pyproject")
-    parser.add_argument("--pyproject", type=pathlib.Path, help="``pyproject.toml``", default="pyproject.toml")
+    parser.add_argument(
+        "--mapping",
+        nargs=2,
+        type=str,
+        action="append",
+        default=[],
+        help="Mapping ['pyproject', 'conda']",
+    )
+    parser.add_argument(
+        "-p",
+        "--from-pyproject",
+        action="store_true",
+        help="Add all dependencies in pyproject to environment",
+    )
+    parser.add_argument(
+        "-e",
+        "--from-environment",
+        action="store_true",
+        help="Add all dependencies in environment to pyproject",
+    )
+    parser.add_argument(
+        "--pyproject", type=pathlib.Path, help="``pyproject.toml``", default="pyproject.toml"
+    )
     parser.add_argument("environment", type=pathlib.Path, help="``environment.yaml``")
     return parser
 
@@ -1560,11 +1579,17 @@ def conda_envfile_pyproject(args: list[str]):
                 i = j
                 continue
             if re.match(r"(requires-python)(\s*)(=)", text[i]):
-                text[i] = f"requires-python = \"{python}\""
+                text[i] = f'requires-python = "{python}"'
             assert not text[i].strip().startswith("[")
 
         deps = list(map(str, deps_tml))
-        text = text[:start] + ["dependencies = ["] + [f'    "{i}",' for i in deps] + ["]"] + text[end + 1:]
+        text = (
+            text[:start]
+            + ["dependencies = ["]
+            + [f'    "{i}",' for i in deps]
+            + ["]"]
+            + text[end + 1 :]
+        )
         args.pyproject.write_text("\n".join(text))
 
     # write updated environment
