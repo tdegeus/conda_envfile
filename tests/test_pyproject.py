@@ -32,7 +32,7 @@ dependencies:
     ftoml.write_text(contents_toml)
     fenv.write_text(contents_env)
 
-    conda_envfile.conda_envfile_pyproject([ftoml, fenv])
+    conda_envfile.conda_envfile_pyproject(["--pyproject", ftoml, fenv])
 
     data = tomllib.loads(ftoml.read_text())["project"]
     assert data["dependencies"] == ["click >=1.0.0", "Jinja2 >=3.0.0"]

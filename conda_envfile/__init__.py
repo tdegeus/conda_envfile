@@ -1418,12 +1418,22 @@ def _conda_envfile_pyproject_parser():
     """
 
     desc = """
-    Compare the dependencies in a ``pyproject.toml`` file with an environment file.
+    Compare the dependencies in a ``pyproject.toml`` file with a conda ``environment.yaml`` file.
+
+    .. note::
+
+        Most often, the conda-forge dependencies are the lowercase package names.
+        For some packages a non-trivial mapping is required.
+        Use ``--mapping`` to add a custom mapping.
+        Please open a pull request to add any missing mapping to the ``aliases`` dictionary.
     """
     parser = argparse.ArgumentParser(formatter_class=_MyFmt, description=textwrap.dedent(desc))
     parser.add_argument("--version", action="version", version=version)
-    parser.add_argument("environment", type=pathlib.Path, help="environment file.")
-    parser.add_argument("pyproject", type=pathlib.Path, help="``pyproject.toml`` file.")
+    parser.add_argument("--mapping", nargs=2, type=str, action="append", default=[], help="Mapping ['pyproject', 'conda']")
+    parser.add_argument("-p", "--from-pyproject", action="store_true", help="Add all dependencies in pyproject to environment")
+    parser.add_argument("-e", "--from-environment", action="store_true", help="Add all dependencies in environment to pyproject")
+    parser.add_argument("--pyproject", type=pathlib.Path, help="``pyproject.toml``", default="pyproject.toml")
+    parser.add_argument("environment", type=pathlib.Path, help="``environment.yaml``")
     return parser
 
 
@@ -1436,13 +1446,8 @@ def conda_envfile_pyproject(args: list[str]):
     parser = _conda_envfile_pyproject_parser()
     args = parser.parse_args(map(str, args))
 
-    try:
-        text_tml = args.pyproject.read_text()
-        data_tml = tomllib.loads(text_tml)
-    except tomllib.TOMLDecodeError as e:
-        args.pyproject, args.environment = args.environment, args.pyproject
-        text_tml = args.pyproject.read_text()
-        data_tml = tomllib.loads(text_tml)
+    text_tml = args.pyproject.read_text()
+    data_tml = tomllib.loads(text_tml)
     data_env = parse_file(args.environment)
     deps_tml = data_tml.get("project", {}).get("dependencies", None)
     python = data_tml.get("project", {}).get("requires-python", None)
@@ -1474,6 +1479,9 @@ def conda_envfile_pyproject(args: list[str]):
             "cppcolormap": "python-cppcolormap",
             "prrng": "python-prrng",
         }
+
+    for key, value in args.mapping:
+        aliases[key] = value
 
     for package in deps_tml_alias:
         package.name = aliases.get(package.name, package.name.lower())
