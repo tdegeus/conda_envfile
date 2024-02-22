@@ -1436,7 +1436,8 @@ def conda_envfile_pyproject(args: list[str]):
     parser = _conda_envfile_pyproject_parser()
     args = parser.parse_args(map(str, args))
 
-    data_tml = toml.loads(args.pyproject.read_text())
+    text_tml = args.pyproject.read_text()
+    data_tml = toml.loads(text_tml)
     data_env = parse_file(args.environment)
     deps_tml = data_tml.get("project", {}).get("dependencies", None)
     python = data_tml.get("project", {}).get("requires-python", None)
@@ -1507,10 +1508,27 @@ def conda_envfile_pyproject(args: list[str]):
             deps_env[i].version = b
 
     if change_tml:
-        data_tml["project"]["dependencies"] = list(map(str, deps_tml))
-        if python is not None:
-            data_tml["project"]["requires-python"] = python
-        args.pyproject.write_text(toml.dumps(data_tml))
+        text = text_tml.splitlines()
+        for i in range(len(text)):
+            if text[i].strip() == "[project]":
+                break
+
+        for i in range(i + 1, len(text)):
+            if re.match(r"(dependencies)(\s*)(=)", text[i]):
+                start = i
+                for j in range(i, len(text)):
+                    if text[j].rstrip().endswith("]"):
+                        break
+                end = j
+                i = j
+                continue
+            if re.match(r"(requires-python)(\s*)(=)", text[i]):
+                text[i] = f"requires-python = \"{python}\""
+            assert not text[i].strip().startswith("[")
+
+        deps = list(map(str, deps_tml))
+        text = text[:start] + ["dependencies = ["] + [f'    "{i}",' for i in deps] + ["]"] + text[end + 1:]
+        args.pyproject.write_text("\n".join(text))
 
     if change_env:
         data_env["dependencies"] = list(map(str, deps_env))
