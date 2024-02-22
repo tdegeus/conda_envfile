@@ -1,4 +1,4 @@
-import toml
+import tomllib
 
 import conda_envfile
 
@@ -34,7 +34,7 @@ dependencies:
 
     conda_envfile.conda_envfile_pyproject([ftoml, fenv])
 
-    data = toml.loads(ftoml.read_text())["project"]
+    data = tomllib.loads(ftoml.read_text())["project"]
     assert data["dependencies"] == ["click >=1.0.0", "Jinja2 >=3.0.0"]
     assert data["requires-python"] == ">=3.11"
 

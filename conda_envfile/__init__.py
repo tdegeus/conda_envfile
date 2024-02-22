@@ -12,7 +12,7 @@ import click
 import packaging.specifiers
 import packaging.version
 import prettytable
-import toml
+import tomllib
 import yaml
 from jinja2 import BaseLoader
 from jinja2 import Environment
@@ -1437,7 +1437,7 @@ def conda_envfile_pyproject(args: list[str]):
     args = parser.parse_args(map(str, args))
 
     text_tml = args.pyproject.read_text()
-    data_tml = toml.loads(text_tml)
+    data_tml = tomllib.loads(text_tml)
     data_env = parse_file(args.environment)
     deps_tml = data_tml.get("project", {}).get("dependencies", None)
     python = data_tml.get("project", {}).get("requires-python", None)
