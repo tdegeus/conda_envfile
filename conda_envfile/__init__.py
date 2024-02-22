@@ -16,8 +16,8 @@ import prettytable
 import yaml
 from jinja2 import BaseLoader
 from jinja2 import Environment
-from packaging.version import _cmpkey
 from packaging.version import Version
+from packaging.version import _cmpkey
 
 from ._version import version
 
