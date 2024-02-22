@@ -528,8 +528,8 @@ def _interpret(dependency: str) -> dict:
     # foo =1.0.*
 
     if re.match(r"^([^=^\s]*)(\s*)([=]+)([^\*]*)(\*)$", dep):
-        _, name, _, eq, basename, wildcard, _ = re.split(
-            r"^([^=^\s]*)(\s*)([=]*)([^\*]*)(\*)$", dep
+        _, name, _, eq, _, basename, wildcard, _ = re.split(
+            r"^([^=^\s]*)(\s*)([=]*)(\s*)([^\*]*)(\*)$", dep
         )
 
         if eq != "=":
@@ -611,9 +611,9 @@ def _interpret(dependency: str) -> dict:
     _, name, _, eq, _, ver, _ = re.split(r"^([^>^<^=^\s]*)(\s*)([<>=]*)(\s*)(.*)$", dep)
     eq2 = None
     ver2 = None
-    sp = re.split(r"^([^,]*)(,)(\s*)([<>=]*)(.*)$", ver)
+    sp = re.split(r"^([^,]*)(,)(\s*)([<>=]*)(\s*)(.*)$", ver)
     if len(sp) > 1:
-        _, ver, _, _, eq2, ver2, _ = sp
+        _, ver, _, _, eq2, _, ver2, _ = sp
 
     ret = {"name": name, "range": VersionRange()}
 
