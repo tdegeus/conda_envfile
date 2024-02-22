@@ -608,7 +608,7 @@ def _interpret(dependency: str) -> dict:
     # foo >1.0, <=2.0
     # foo >=1.0, <=2.0
 
-    _, name, _, eq, ver, _ = re.split(r"^([^>^<^=^\s]*)(\s*)([<>=]*)(.*)$", dep)
+    _, name, _, eq, _, ver, _ = re.split(r"^([^>^<^=^\s]*)(\s*)([<>=]*)(\s*)(.*)$", dep)
     eq2 = None
     ver2 = None
     sp = re.split(r"^([^,]*)(,)(\s*)([<>=]*)(.*)$", ver)

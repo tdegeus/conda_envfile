@@ -9,6 +9,16 @@ def test_setter():
     assert str(v) == "foo >=2.0.0"
 
 
+def test_norm():
+    tests = [
+        ["foo >= 1.0.0", "foo >=1.0.0"],
+        ["foo = 1.0", "foo =1.0"],
+    ]
+    for a, b in tests:
+        v = conda_envfile.PackageSpecifier(a)
+        assert str(v) == b
+
+
 def test_build():
     v = conda_envfile.PackageSpecifier("foo=1.0=pypy")
     assert str(v) == "foo=1.0=pypy"
