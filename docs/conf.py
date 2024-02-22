@@ -13,6 +13,7 @@ extensions = [
     "sphinx.ext.todo",
     "sphinxarg.ext",
     "sphinx.ext.autosectionlabel",
+    "sphinx_mdinclude",
 ]
 
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]

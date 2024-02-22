@@ -1133,7 +1133,9 @@ def _conda_envfile_parse_parser():
     """
 
     desc = """
-    Parse YAML environment files, formatted::
+    Parse conda environment files.
+    This keeps the list of packages unique, sorted, and with legal versions.
+    It assumes YAML-files formatted like::
 
         name: ...
         channels:
@@ -1176,7 +1178,9 @@ def _conda_envfile_merge_parser():
     """
 
     desc = """
-    Merge YAML environment files, formatted::
+    Merge conda environment files.
+    This creates a list of packages that is unique, sorted, and with the most restrictive versions.
+    It assumes YAML-files formatted like::
 
         name: ...
         channels:
@@ -1418,7 +1422,9 @@ def _conda_envfile_pyproject_parser():
     """
 
     desc = """
-    Compare the dependencies in a ``pyproject.toml`` file with a conda ``environment.yaml`` file.
+    Sync the version limitations in a ``pyproject.toml`` file and a conda ``environment.yaml`` file.
+    Optionally, all missing dependencies in one or the other can be added
+    (``--from-pyproject`` or ``--from-environment``).
 
     .. note::
 

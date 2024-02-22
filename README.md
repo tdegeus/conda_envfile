@@ -12,7 +12,10 @@ Provides a Python library, command line tools, and pre-commit tools to manage co
 
 ## Command line
 
-From the command line:
+### conda_envfile_merge
+
+Merge different environment files.
+For example:
 
 ```bash
 conda_envfile_merge -a "extra-library" env1.yml env2.yml > env3.yml
@@ -20,19 +23,42 @@ conda_envfile_merge -a "extra-library" env1.yml env2.yml > env3.yml
 
 merges `env1.yml` and `env2.yml` and adds the package `extra-library` to the merged environment file `env3.yml`.
 
+### conda_envfile_diff
+
+Show the difference between two environment files.
+For example:
+
+```bash
+conda_envfile_diff env1.yml env2.yml
+```
+
 ## pre-commit
 
+### conda_envfile_parse
+
+Keep your `environment.yaml` file unique, sorted, and legal in terms of version limitations.
 In your `.pre-commit-config.yaml`, add:
 
 ```yaml
 - repo: https://github.com/tdegeus/conda_envfile
-  rev: v0.2.1
+  rev: v0.5.0
   hooks:
   - id: conda_envfile_parse
     files: "environment.yaml"
 ```
 
-to keep your `environment.yaml` file unique, sorted, and legal in terms of version limitations.
+### conda_envfile_pyproject
+
+Keep your `pyproject.toml` and `environment.yaml` in sync.
+In your `.pre-commit-config.yaml`, add:
+
+```yaml
+- repo: https://github.com/tdegeus/conda_envfile
+  rev: v0.5.0
+  hooks:
+  - id: conda_envfile_pyproject
+    files: "environment.yaml"
+```
 
 ## Python
 

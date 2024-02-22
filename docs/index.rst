@@ -17,6 +17,8 @@
   `www.geus.me <http://www.geus.me>`_ |
   `github.com/tdegeus/conda_envfile <http://github.com/tdegeus/conda_envfile>`_
 
+.. mdinclude:: ../README.md
+
 Contents
 ========
 
