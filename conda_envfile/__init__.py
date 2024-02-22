@@ -1599,7 +1599,7 @@ def conda_envfile_pyproject(args: list[str]):
             + ["]"]
             + text[end + 1 :]
         )
-        args.pyproject.write_text("\n".join(text))
+        args.pyproject.write_text("\n".join(text) + "\n")
 
     # write updated environment
     if change_env:
