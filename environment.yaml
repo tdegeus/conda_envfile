@@ -8,7 +8,7 @@ dependencies:
 - pre-commit
 - prettytable
 - pytest
-- python
+- python >=3.11
 - pyyaml
 - setuptools_scm
 - sphinx

@@ -57,7 +57,9 @@ repos:
   hooks:
   - id: setup-cfg-fmt
 - repo: https://github.com/tdegeus/conda_envfile
-  rev: v0.4.2
+  rev: v0.5.0
   hooks:
   - id: conda_envfile_parse
+    files: environment.yaml
+  - id: conda_envfile_pyproject
     files: environment.yaml

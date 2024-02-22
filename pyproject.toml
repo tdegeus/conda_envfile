@@ -9,7 +9,7 @@ description = "Inspect/combine conda YAML environment files"
 dynamic = ["version"]
 name = "conda_envfile"
 readme = "README.md"
-requires-python = ">=3.6"
+requires-python = ">=3.11"
 
 [project.scripts]
 conda_envfile_diff = "conda_envfile:_conda_envfile_diff_cli"
