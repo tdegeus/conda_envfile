@@ -817,7 +817,7 @@ def unique(*args) -> list[PackageSpecifier]:
         dep = PackageSpecifier(dep)
         deps[dep.name] += dep
 
-    return [deps[key] for key in sorted(deps)]
+    return [deps[key] for key in sorted(deps, key=lambda x: x.lower())]
 
 
 def restrict(source, other: list[str] = None) -> list[PackageSpecifier]:
@@ -1436,6 +1436,11 @@ def _conda_envfile_pyproject_parser():
     parser = argparse.ArgumentParser(formatter_class=_MyFmt, description=textwrap.dedent(desc))
     parser.add_argument("--version", action="version", version=version)
     parser.add_argument(
+        "--format",
+        action="store_true",
+        help="Apply basic formatting to both files: unique sorted dependency-list",
+    )
+    parser.add_argument(
         "--mapping",
         nargs=2,
         type=str,
@@ -1568,8 +1573,20 @@ def conda_envfile_pyproject(args: list[str]):
                 orig.name = inv_aliases.get(dep.name, dep.name)
                 deps_tml.append(orig)
 
+    # format
+    if args.format:
+        ret = unique(*deps_tml)
+        if ret != deps_tml:
+            change_tml = True
+            deps_tml = ret
+
+        ret = unique(*deps_env)
+        if ret != deps_env:
+            change_env = True
+            deps_env = ret
+
     # write updated toml
-    if change_tml:
+    if change_tml or args.format:
         text = text_tml.splitlines()
         for i in range(len(text)):
             if text[i].strip() == "[project]":
