@@ -802,6 +802,19 @@ def remove(dependencies: list[str], *args: list[str]) -> list[str]:
     return ret
 
 
+def _unique(*args) -> dict[PackageSpecifier]:
+    """
+    Return dictionary with unique, most restrictive, dependencies.
+    """
+    deps = defaultdict(PackageSpecifier)
+
+    for dep in args:
+        dep = PackageSpecifier(dep)
+        deps[dep.name] += dep
+
+    return deps
+
+
 def unique(*args) -> list[PackageSpecifier]:
     """
     Return a list of 'unique' dependencies. If multiple dependencies with the same name are given,
@@ -810,13 +823,7 @@ def unique(*args) -> list[PackageSpecifier]:
     :param args: Dependencies to merge.
     :return: List of unique dependencies (convert to strings: ``list(map(str, unique(*args)))``)
     """
-
-    deps = defaultdict(PackageSpecifier)
-
-    for dep in args:
-        dep = PackageSpecifier(dep)
-        deps[dep.name] += dep
-
+    deps = _unique(*args)
     return [deps[key] for key in sorted(deps, key=lambda x: x.lower())]
 
 
@@ -1423,14 +1430,14 @@ def _conda_envfile_pyproject_parser():
 
     desc = """
     Sync the version limitations in a ``pyproject.toml`` file and a conda ``environment.yaml`` file.
-    Optionally, all missing dependencies in one or the other can be added
+    Optionally, all dependencies of one file can be added to the other
     (``--from-pyproject`` or ``--from-environment``).
 
     .. note::
 
         Most often, the conda-forge dependencies are the lowercase package names.
         For some packages a non-trivial mapping is required.
-        Use ``--mapping`` to add a custom mapping.
+        Use ``--mapping`` to add custom mapping(s).
         Please open a pull request to add any missing mapping to the ``aliases`` dictionary.
     """
     parser = argparse.ArgumentParser(formatter_class=_MyFmt, description=textwrap.dedent(desc))
@@ -1438,7 +1445,7 @@ def _conda_envfile_pyproject_parser():
     parser.add_argument(
         "--format",
         action="store_true",
-        help="Apply basic formatting to both files: unique sorted dependency-list",
+        help="Basic formatting of both files: unique sorted dependency-list",
     )
     parser.add_argument(
         "--mapping",
@@ -1471,7 +1478,7 @@ def conda_envfile_pyproject(args: list[str]):
     """
     Command-line tool, see ``--help``.
 
-    :param args: Command-line arguments (should be all strings).
+    :param args: Command-line arguments.
     """
     parser = _conda_envfile_pyproject_parser()
     args = parser.parse_args(map(str, args))
@@ -1484,13 +1491,14 @@ def conda_envfile_pyproject(args: list[str]):
     deps_env = data_env.get("dependencies", None)
 
     if deps_env is None or deps_tml is None:
+        assert not args.from_pyproject, "One or both files have no dependencies"
+        assert not args.from_environment, "One or both files have no dependencies"
         return
 
     deps_tml = list(map(PackageSpecifier, deps_tml))
     deps_env = list(map(PackageSpecifier, deps_env))
 
     # list of dependencies in toml mapped to conda package names
-    deps_tml_alias = copy.deepcopy(deps_tml)
     aliases = {}
 
     if "conda-forge" in data_env.get("channels", []):
@@ -1515,23 +1523,18 @@ def conda_envfile_pyproject(args: list[str]):
 
     inv_aliases = {v: k for k, v in aliases.items()}
 
+    deps_tml_alias = copy.deepcopy(deps_tml)
     for package in deps_tml_alias:
         package.name = aliases.get(package.name, package.name.lower())
 
-    # list of most restrictive dependencies
-    extra = []
+    # dictionary  of most restrictive dependencies
+    deps = deps_tml_alias + deps_env
     if python is not None:
-        extra.append(PackageSpecifier(f"python {python}"))
-
-    dependencies = defaultdict(PackageSpecifier)
-    for dep in deps_tml_alias + deps_env + extra:
-        dep = PackageSpecifier(dep)
-        dependencies[dep.name] += dep
-
-    change_env = False
-    change_tml = False
+        deps.append(PackageSpecifier(f"python {python}"))
+    dependencies = _unique(*deps)
 
     # update toml
+    change_tml = False
     for i, alias in enumerate(deps_tml_alias):
         a = str(deps_tml[i].version)
         b = str(dependencies[alias.name].version)
@@ -1545,6 +1548,7 @@ def conda_envfile_pyproject(args: list[str]):
             python = str(dependencies["python"].version)
 
     # update env
+    change_env = False
     for i, dep in enumerate(deps_env):
         a = str(dep.version)
         b = str(dependencies[dep.name].version)
@@ -1586,6 +1590,7 @@ def conda_envfile_pyproject(args: list[str]):
             deps_env = ret
 
     # write updated toml
+    # (the implementation is a bit rudimentary and could be improved)
     if change_tml or args.format:
         text = text_tml.splitlines()
         for i in range(len(text)):
