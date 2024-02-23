@@ -40,6 +40,13 @@ class _MyFmt(
     pass
 
 
+def _parse(parser: argparse.ArgumentParser, cli_args: list[str]) -> argparse.ArgumentParser:
+    if cli_args is None:
+        return parser.parse_args(sys.argv[1:])
+
+    return parser.parse_args([str(arg) for arg in cli_args])
+
+
 class VersionRange:
     """
     Specify the most restrictive version range.
@@ -1158,7 +1165,7 @@ def _conda_envfile_parse_parser():
     return parser
 
 
-def conda_envfile_parse(args: list[str]):
+def conda_envfile_parse(args: list[str] = None):
     """
     Command-line tool, see ``--help``.
 
@@ -1166,17 +1173,13 @@ def conda_envfile_parse(args: list[str]):
     """
 
     parser = _conda_envfile_parse_parser()
-    args = parser.parse_args(args)
+    args = _parse(parser, args)
 
     for filename in args.files:
         env = parse_file(filename)
         env["dependencies"] = list(map(str, unique(*env["dependencies"])))
         with open(filename, "w") as file:
             yaml.dump(env, file, sort_keys=False)
-
-
-def _conda_envfile_parse_cli():
-    conda_envfile_parse(sys.argv[1:])
 
 
 def _conda_envfile_merge_parser():
@@ -1215,7 +1218,7 @@ def _conda_envfile_merge_parser():
     return parser
 
 
-def conda_envfile_merge(args: list[str]):
+def conda_envfile_merge(args: list[str] = None):
     """
     Command-line tool, see ``--help``.
 
@@ -1223,7 +1226,7 @@ def conda_envfile_merge(args: list[str]):
     """
 
     parser = _conda_envfile_merge_parser()
-    args = parser.parse_args(args)
+    args = _parse(parser, args)
     env = parse_file(*args.files)
 
     if args.github_action:
@@ -1273,10 +1276,6 @@ def conda_envfile_merge(args: list[str]):
         yaml.dump(env, file)
 
 
-def _conda_envfile_merge_cli():
-    conda_envfile_merge(sys.argv[1:])
-
-
 def _conda_envfile_restrict_parser():
     """
     Return parser for :py:func:`conda_envfile_restrict`.
@@ -1310,7 +1309,7 @@ def _conda_envfile_restrict_parser():
     return parser
 
 
-def conda_envfile_restrict(args: list[str]):
+def conda_envfile_restrict(args: list[str] = None):
     """
     Command-line tool, see ``--help``.
 
@@ -1318,7 +1317,7 @@ def conda_envfile_restrict(args: list[str]):
     """
 
     parser = _conda_envfile_restrict_parser()
-    args = parser.parse_args(args)
+    args = _parse(parser, args)
 
     if len(args.conda_forge) > 0:
         other = []
@@ -1369,10 +1368,6 @@ def conda_envfile_restrict(args: list[str]):
         yaml.dump(env, file)
 
 
-def _conda_envfile_restrict_cli():
-    conda_envfile_restrict(sys.argv[1:])
-
-
 def _conda_envfile_diff_parser():
     """
     Return parser for :py:func:`conda_envfile_diff`.
@@ -1394,7 +1389,7 @@ def _conda_envfile_diff_parser():
     return parser
 
 
-def conda_envfile_diff(args: list[str]):
+def conda_envfile_diff(args: list[str] = None):
     """
     Command-line tool, see ``--help``.
 
@@ -1402,7 +1397,7 @@ def conda_envfile_diff(args: list[str]):
     """
 
     parser = _conda_envfile_diff_parser()
-    args = parser.parse_args(args)
+    args = _parse(parser, args)
 
     diff = []
     for filename in args.files:
@@ -1417,10 +1412,6 @@ def conda_envfile_diff(args: list[str]):
         raise ValueError("Need exactly two files")
 
     print_diff(*diff)
-
-
-def _conda_envfile_diff_cli():
-    conda_envfile_diff(sys.argv[1:])
 
 
 def _conda_envfile_pyproject_parser():
@@ -1474,14 +1465,14 @@ def _conda_envfile_pyproject_parser():
     return parser
 
 
-def conda_envfile_pyproject(args: list[str]):
+def conda_envfile_pyproject(args: list[str] = None):
     """
     Command-line tool, see ``--help``.
 
     :param args: Command-line arguments.
     """
     parser = _conda_envfile_pyproject_parser()
-    args = parser.parse_args(map(str, args))
+    args = _parse(parser, args)
 
     text_tml = args.pyproject.read_text()
     data_tml = tomllib.loads(text_tml)
@@ -1628,7 +1619,3 @@ def conda_envfile_pyproject(args: list[str]):
         data_env["dependencies"] = list(map(str, deps_env))
         with open(args.environment, "w") as file:
             yaml.dump(data_env, file, sort_keys=False)
-
-
-def _conda_envfile_pyproject_cli():
-    conda_envfile_pyproject(sys.argv[1:])
